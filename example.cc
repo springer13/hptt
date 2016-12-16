@@ -75,10 +75,12 @@ public:
 
 
   void reset_data() {
+#pragma omp parallel for
      for(int i=0;i < this->input_data_len ; ++i)
-        input_data[i] = ((rand() % 1000) - 500.) / 1000.;
+        input_data[i] = (((i+1)*13 % 10000) - 5000.) / 10000.;
+#pragma omp parallel for
      for(int i=0;i < this->input_data_len ; ++i)
-        output_data[i] = ((rand() % 1000) - 500.) / 1000.;
+        output_data[i] = (((i+1)*13 % 10000) - 5000.) / 10000.;
 //    constexpr TensorIdx inner_offset = sizeof(FloatType) / sizeof(Deduced);
 //    // Reset input data
 //    for (TensorIdx idx = 0; idx < this->input_data_len; ++idx) {
@@ -190,7 +192,12 @@ void equal_(const float *A, const float*B, int total_size){
 }
 
 int main(int argc, char *argv[]) {
-  // 3-dim
+  int numThreads = 1;
+  if( getenv("OMP_NUM_THREADS") != NULL )
+     numThreads = atoi(getenv("OMP_NUM_THREADS"));
+  printf("numThreads: %d\n",numThreads);
+
+  //###################### 4-dim ##########################################
   // Prepare data
   vector<TensorIdx> size{ 64, 2320, 384 };
   vector<TensorDim> perm{ 2, 1, 0 };
@@ -210,62 +217,61 @@ int main(int argc, char *argv[]) {
   posix_memalign((void**) &B_copy, 32, sizeof(float) * total_size);
   posix_memalign((void**) &B_ttc, 32, sizeof(float) * total_size);
   int nRepeat = 5;
+#pragma omp parallel for
   for(int i=0;i < total_size ; ++i)
   {
      B_copy[i] = inst.output_data[i];
      B_ttc[i] = inst.output_data[i];
   }
 
+#pragma omp parallel for
   for(int i=0;i < largerThanL3; ++i)
   {
-     trash1[i] = rand();
-     trash2[i] = rand();
+     trash1[i] = ((i+1)*13)%100000;
+     trash2[i] = ((i+1)*13)%100000;
   }
 
   // Execute transpose
-  trashCache(trash1, trash2, largerThanL3);
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         sTranspose_210_384x2320x64<384,2320,64>( inst.input_data, B_ttc, alpha, beta, NULL, NULL);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "TTC: 3-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC: 3-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
-  trashCache(trash1, trash2, largerThanL3);
   {  //ttc-c-paul
      int perm_[] = {2,1,0};
      int size_[] = {384,2320,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 3;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_);
+     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         ttc_sTranspose(inst.input_data, B_copy, alpha, beta, plan);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "TTC (paul): 3-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (paul): 3-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
   // Verification
   equal_(B_ttc, B_copy, total_size);
 
-  trashCache(trash1, trash2, largerThanL3);
   {  //ttc-c-tong
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         inst.exec();
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "tong 3-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (tong): 3-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
 
   // Verification
@@ -275,7 +281,6 @@ int main(int argc, char *argv[]) {
 
   //###################### 4-dim ##########################################
   // Prepare data
-  cout << "4D\n";
   vector<TensorIdx> size4{ 96, 96, 96, 96 };
   vector<TensorDim> perm4{ 3, 0, 2, 1 };
 
@@ -284,42 +289,41 @@ int main(int argc, char *argv[]) {
   posix_memalign((void**) &B_ttc , 32, sizeof(float) * inst4.input_data_len);
   posix_memalign((void**) &B_copy, 32, sizeof(float) * inst4.input_data_len);
 
+#pragma omp parallel for
   for(int i=0;i < inst4.input_data_len; ++i){
      B_copy[i] = inst4.output_data[i];
      B_ttc[i] = inst4.output_data[i];
   }
 
   // Execute transpose
-  trashCache(trash1, trash2, largerThanL3);
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         //sTranspose_3210_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
         sTranspose_3021_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
         //sTranspose_210_96x9216x96<96,9216,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "TTC: 4-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (orig): 4-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
-  trashCache(trash1, trash2, largerThanL3);
   {  // my TTC-C
      int perm_[] = {3,0,2,1};
      int size_[] = {96,96,96,96}; // ATTENTION: different order than in Tong's code
      int dim_ = 4;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_);
+     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         ttc_sTranspose(inst4.input_data, B_copy, alpha, beta, plan);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "my ttc 4-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (paul): 4-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
   printf("my: ");
   equal_(B_ttc, B_copy, total_size);
@@ -327,13 +331,13 @@ int main(int argc, char *argv[]) {
   {  // Tong's TTC-C
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         inst4.exec();
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "tong 4-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (tong): 4-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   } 
   // Verification
   printf("tong: ");
@@ -343,7 +347,6 @@ int main(int argc, char *argv[]) {
   exit(0);
 
   //###################### 5-dim ##########################################
-  cout << "5D\n";
   // Prepare data
   vector<TensorIdx> size5{ 64, 64, 64, 64, 64};
   vector<TensorDim> perm5{ 4, 3, 2, 1, 0 };
@@ -353,6 +356,7 @@ int main(int argc, char *argv[]) {
   posix_memalign((void**) &B_ttc , 32, sizeof(float) * inst5.input_data_len);
   posix_memalign((void**) &B_copy, 32, sizeof(float) * inst5.input_data_len);
 
+#pragma omp parallel for
   for(int i=0;i < inst5.input_data_len; ++i){
      B_copy[i] = inst5.output_data[i];
      B_ttc[i] = inst5.output_data[i];
@@ -360,48 +364,45 @@ int main(int argc, char *argv[]) {
 
 
   // Execute transpose
-  trashCache(trash1, trash2, largerThanL3);
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         sTranspose_43210_64x64x64x64x64<64,64,64,64,64>(inst5.input_data, B_ttc, alpha, beta, NULL, NULL);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "TTC: 5-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (orig): 5-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
-  trashCache(trash1, trash2, largerThanL3);
   {  // my TTC-C
      int perm_[] = {4,3,2,1,0};
      int size_[] = {64,64,64,64,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 5;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_);
+     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         ttc_sTranspose(inst5.input_data, B_copy, alpha, beta, plan);
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "my ttc 5-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (paul): 5-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
   equal_(B_ttc, B_copy, total_size);
 
-  trashCache(trash1, trash2, largerThanL3);
   {  // tong
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        auto begin_time = chrono::high_resolution_clock::now();
+        trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
         inst5.exec();
-        auto time_diff = chrono::high_resolution_clock::now() - begin_time;
-        auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
-        minTime = (ms < minTime) ? ms : minTime;
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     cout << "5-dim Elapsed time: " << minTime << "ms." << endl;
+     printf("TTC (tong): 5-dim Elapsed time: %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
   printf("tong: ");
   equal_(inst5.output_data, B_copy, total_size);

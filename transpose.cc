@@ -1,5 +1,6 @@
 #include <list>
 #include <tuple>
+#include <omp.h>
 
 #include <stdio.h>
 #include <xmmintrin.h>
@@ -7,6 +8,9 @@
 #include <complex.h>
 
 #include "ttc_c.h"
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -112,6 +116,73 @@ static INLINE void sTranspose16x16(const float* __restrict__ A, const int lda, f
    //invoke micro-transpose
    sTranspose8x8(A + 8 + 8 * lda, lda, B + 8 + 8 * ldb, ldb  , reg_alpha , reg_beta);
 
+}
+template<int blockingA, int blockingB>
+static INLINE void sTranspose(const float* __restrict__ A, const int lda, float* __restrict__ B, const int ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
+{
+   //invoke micro-transpose
+   if(blockingA > 0 && blockingB > 0 )
+   sTranspose8x8(A, lda, B, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 0 && blockingB > 8 )
+   sTranspose8x8(A + 8 * lda, lda, B + 8, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 0 && blockingB > 16 )
+   sTranspose8x8(A + 16 * lda, lda, B + 16, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 0 && blockingB > 24 )
+   sTranspose8x8(A + 24 * lda, lda, B + 24, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 8 && blockingB > 0 )
+   sTranspose8x8(A + 8, lda, B + 8 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 8 && blockingB > 8 )
+   sTranspose8x8(A + 8 + 8 * lda, lda, B + 8 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 8 && blockingB > 16 )
+   sTranspose8x8(A + 8 + 16 * lda, lda, B + 16 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 8 && blockingB > 24 )
+   sTranspose8x8(A + 8 + 24 * lda, lda, B + 24 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 16 && blockingB > 0 )
+   sTranspose8x8(A + 16, lda, B + 16 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 16 && blockingB > 8 )
+   sTranspose8x8(A + 16 + 8 * lda, lda, B + 8 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 16 && blockingB > 16 )
+   sTranspose8x8(A + 16 + 16 * lda, lda, B + 16 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 16 && blockingB > 24 )
+   sTranspose8x8(A + 16 + 24 * lda, lda, B + 24 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 24 && blockingB > 0 )
+   sTranspose8x8(A + 24, lda, B + 24 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 24 && blockingB > 8 )
+   sTranspose8x8(A + 24 + 8 * lda, lda, B + 8 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 24 && blockingB > 16 )
+   sTranspose8x8(A + 24 + 16 * lda, lda, B + 16 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+
+   //invoke micro-transpose
+   if(blockingA > 24 && blockingB > 24 )
+   sTranspose8x8(A + 24 + 24 * lda, lda, B + 24 + 24 * ldb, ldb  , reg_alpha , reg_beta);
 }
 #endif
 
@@ -267,7 +338,31 @@ int fuseIndices(const int *outerSizeA, const int *outerSizeB, const int *size, c
    return dim_;
 }
 
-node_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size, const int* perm, const int dim)
+void getParallelismStrategy(const int*size, const int*perm, const int* loopOrder, const int dim, const int numThreads, const int blocking, int *parallelismPerLoop)
+{
+   int remainingTasks = numThreads;
+   for(int i=0;i < dim ; ++i){
+      int increment = 1;
+      if( i== 0 || i== perm[0] )
+         increment = blocking;
+      int numParallelismAvailable = (size[i] + increment - 1) / increment;
+      if ( remainingTasks > 1 && numParallelismAvailable % remainingTasks == 0 )
+      {
+         parallelismPerLoop[i] = remainingTasks ; //TODO create thread communicators
+         remainingTasks = 0;
+      }else
+         parallelismPerLoop[i] = 1;
+   }
+}
+
+void getLoopOrder(const int *perm, const int dim, int *loopOrder)
+{
+   // TODO use heuristics
+   for(int i=0; i < dim; ++i)
+      loopOrder[i] = perm[dim-1-i]; // loop-order according to: reversed(perm_)
+}
+
+plan_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size, const int* perm, const int dim, int numThreads)
 {
    int emitCode = 0; // only for DEBUGGING
 
@@ -277,75 +372,103 @@ node_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
       exit(-1);
    }
 
+   const int blocking = 32;
    int outerSizeA_[dim];
    int outerSizeB_[dim];
    int size_[dim];
    int perm_[dim];
    int dim_ = fuseIndices(outerSizeA, outerSizeB, size, perm, dim, 
-                          outerSizeA_, outerSizeB_, size_, perm_);
-
+         outerSizeA_, outerSizeB_, size_, perm_);
 
    int lda[dim_];
    int ldb[dim_];
    computeLeadingDimensions( size_, perm_, dim_, outerSizeA_, outerSizeB_, lda, ldb );
-   
-   node_t *plan = (node_t*) malloc(sizeof(node_t));
-   node_t *currentPtr = plan;
 
-   int posStride1A_inB = findPos(0, perm_, dim_);
-   int posStride1B_inA = perm_[0];
+   int loopOrder[dim_];
+   getLoopOrder(perm_, dim_, loopOrder);
+   int parallelismPerLoop[dim_];
+   getParallelismStrategy(size_, perm_, loopOrder, dim_, numThreads, blocking, parallelismPerLoop);
 
-   if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
+   plan_t *plan = (plan_t*) malloc(sizeof(plan_t));
+   plan->numThreads = numThreads;
+   plan->localPlans = (node_t **) malloc(sizeof(node_t*) * numThreads);
 
-   // create loops
-   for(int i=0; i < dim_; ++i) {
-      int index = perm_[dim_-1-i]; // loop-order according to: reversed(perm_)
+#pragma omp parallel num_threads(numThreads)
+   {
+      int threadId = omp_get_thread_num();
+      node_t *localPlan = (node_t*) malloc(sizeof(node_t));
+      node_t *currentPtr = localPlan;
 
-      currentPtr->start = 0;
-      if( index == 0 || index == perm_[0] )
-         currentPtr->inc = 16;
-      else
-         currentPtr->inc = 1;
-      currentPtr->end = size_[index];
-      currentPtr->lda = lda[index];
-      currentPtr->ldb = ldb[findPos(index, perm_, dim_)];
-      currentPtr->next = (node_t*) malloc(sizeof(node_t));
+      int posStride1A_inB = findPos(0, perm_, dim_);
+      int posStride1B_inA = perm_[0];
 
-      if ( emitCode ){
-         char underscores_old[10];
-         for(int j=0;j < i ; ++j)
-            underscores_old[j] = '_';
-         underscores_old[i] = '\0';
-         char underscores[10];
-         for(int j=0;j <= i ; ++j)
-            underscores[j] = '_';
-         underscores[i+1] = '\0';
+      if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
 
-         printf("for(int i%d = %d; i%d < %d; i%d += %d){\n",index,currentPtr->start,index,currentPtr->end,index,currentPtr->inc);
-         printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm_, dim_));
+      // create loops
+      for(int i=0; i < dim_; ++i){
+         int index = loopOrder[i];
+
+         if( index == 0 || index == perm_[0] )
+            currentPtr->inc = blocking;
+         else
+            currentPtr->inc = 1;
+
+         int numThreadsPerLoop = parallelismPerLoop[index];
+         int workPerThread = size_[index] / numThreadsPerLoop;
+         if( size_[index] % numThreadsPerLoop != 0 )
+            printf("ERROR: x\n");
+         
+         printf("loop %d uses %d threads\n",index, numThreadsPerLoop );
+
+         if( numThreadsPerLoop > 1 ){ //TODO only works if all threads parallelize across one loop
+            if(  numThreadsPerLoop != numThreads )
+               printf("ERROR: threads need to parallelize across one loop\n");
+            currentPtr->start = threadId * workPerThread;
+            currentPtr->end = MIN( size_[index], (threadId+1) * workPerThread );
+         }else{
+            currentPtr->start = 0;
+            currentPtr->end = size_[index];
+         }
+         currentPtr->lda = lda[index];
+         currentPtr->ldb = ldb[findPos(index, perm_, dim_)];
+         currentPtr->next = (node_t*) malloc(sizeof(node_t));
+
+         if ( emitCode ){
+            char underscores_old[10];
+            for(int j=0;j < i ; ++j)
+               underscores_old[j] = '_';
+            underscores_old[i] = '\0';
+            char underscores[10];
+            for(int j=0;j <= i ; ++j)
+               underscores[j] = '_';
+            underscores[i+1] = '\0';
+
+            printf("for(int i%d = %d; i%d < %d; i%d += %d){\n",index,currentPtr->start,index,currentPtr->end,index,currentPtr->inc);
+            printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm_, dim_));
+         }
+
+         currentPtr = currentPtr->next;
       }
 
-      currentPtr = currentPtr->next;
+      //macro-kernel
+      currentPtr->start = -1;
+      currentPtr->end = -1;
+      currentPtr->inc = -1;
+      currentPtr->lda = lda[ posStride1B_inA ];
+      currentPtr->ldb = ldb[ posStride1A_inB ];
+      currentPtr->next = nullptr;
+      if ( emitCode ){
+         char underscores[20];
+         for(int j=0;j < dim_ ; ++j)
+            underscores[j] = '_';
+         underscores[dim_] = '\0';
+
+         printf("  sTranspose16x16(A%s, lda%d, B%s, ldb%d, reg_alpha, reg_beta);\n",underscores,posStride1B_inA, underscores, posStride1A_inB);
+         for(int j=0;j < dim_ ; ++j)
+            printf("  }\n");
+      }
+      plan->localPlans[omp_get_thread_num()] = localPlan;
    }
-
-   //macro-kernel
-   currentPtr->start = -1;
-   currentPtr->end = -1;
-   currentPtr->inc = -1;
-   currentPtr->lda = lda[ posStride1B_inA ];
-   currentPtr->ldb = ldb[ posStride1A_inB ];
-   currentPtr->next = nullptr;
-   if ( emitCode ){
-      char underscores[20];
-      for(int j=0;j < dim_ ; ++j)
-         underscores[j] = '_';
-      underscores[dim_] = '\0';
-
-      printf("  sTranspose16x16(A%s, lda%d, B%s, ldb%d, reg_alpha, reg_beta);\n",underscores,posStride1B_inA, underscores, posStride1A_inB);
-      for(int j=0;j < dim_ ; ++j)
-         printf("  }\n");
-   }
-
    return plan;
 }
 
@@ -362,20 +485,21 @@ void ttc_sTranspose_int( const float* __restrict__ A, float* __restrict__ B, con
          ttc_sTranspose_int( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
    else 
       // invoke macro-kernel
-      sTranspose16x16(A, lda_, B, ldb_, alpha, beta);
+      sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
 }
 
 /**
  * B(i2,i1,i0) <- alpha * A(i0,i1,i2) + beta * B(i2,i1,i0);
  */
-void ttc_sTranspose( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, const node_t*plan)
+void ttc_sTranspose( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, plan_t* plan)
 {
    //broadcast reg_alpha
    __m256 reg_alpha = _mm256_set1_ps(alpha);
    //broadcast reg_beta
    __m256 reg_beta = _mm256_set1_ps(beta);
 
-   ttc_sTranspose_int( A, B, reg_alpha, reg_beta, plan);
+#pragma omp parallel num_threads(plan->numThreads)
+   ttc_sTranspose_int( A, B, reg_alpha, reg_beta, plan->localPlans[omp_get_thread_num()] );
 }
 
 void trashCache(double *A, double *B, int n)
