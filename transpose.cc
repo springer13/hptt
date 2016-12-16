@@ -1,8 +1,12 @@
-#include "ttc_c.h"
+#include <list>
+#include <tuple>
+
 #include <stdio.h>
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include <complex.h>
+
+#include "ttc_c.h"
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -121,7 +125,7 @@ int findPos(int value, const int *array, int n)
    return -1;
 }
 
-int verifyParameter(const int *size, const int* perm, const int dim)
+int verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim)
 {
    if ( dim < 2 )
       return 1;
@@ -140,6 +144,17 @@ int verifyParameter(const int *size, const int* perm, const int dim)
    for(int i=0;i < dim ; ++i)
       if( found[i] <= 0 )
          return 3;
+
+   if ( outerSizeA != NULL )
+      for(int i=0;i < dim ; ++i)
+         if ( outerSizeA[i] < size[i] )
+            return 4;
+
+   if ( outerSizeB != NULL )
+      for(int i=0;i < dim ; ++i)
+         if ( outerSizeB[i] < size[perm[i]] )
+            return 5;
+
    return 0;
 }
 
@@ -148,7 +163,7 @@ void computeLeadingDimensions( const int* size, const int *perm, int dim,
                                int *lda, int *ldb )
 {
    lda[0] = 1;
-   if( outerSizeA == NULL )
+   if( outerSizeA == NULL || outerSizeA[0] == -1 )
       for(int i=1;i < dim ; ++i)
          lda[i] = lda[i-1] * size[i-1];
    else
@@ -156,7 +171,7 @@ void computeLeadingDimensions( const int* size, const int *perm, int dim,
          lda[i] = outerSizeA[i-1] * lda[i-1];
 
    ldb[0] = 1;
-   if( outerSizeB == NULL )
+   if( outerSizeB == NULL || outerSizeB[0] == -1 )
       for(int i=1;i < dim ; ++i)
          ldb[i] = ldb[i-1] * size[perm[i-1]];
    else
@@ -164,40 +179,136 @@ void computeLeadingDimensions( const int* size, const int *perm, int dim,
          ldb[i] = outerSizeB[i-1] * ldb[i-1];
 }
 
+int fuseIndices(const int *outerSizeA, const int *outerSizeB, const int *size, const int* perm, const int dim,
+                 int *outerSizeA_, int *outerSizeB_, int *size_, int* perm_)
+{
+   // fuses indices whenever possible 
+   // For instance:
+   // perm=3,1,2,0 & size=10,11,12,13  becomes: perm=2,1,0 & size=10,11*12,13
+
+   std::list< std::tuple<int, int> > fusedIndices;
+
+   int dim_ = 0;
+   for(int i=0;i < dim ; ++i)
+   {
+      size_[i] = size[i];
+      if( outerSizeA != NULL )
+         outerSizeA_[i] = outerSizeA[i];
+      else
+         outerSizeA_[i] = -1;
+      if( outerSizeB != NULL )
+         outerSizeB_[i] = outerSizeB[i];
+      else
+         outerSizeB_[i] = -1;
+   }
+
+   // correct perm
+   for(int i=0;i < dim ; ++i){
+      perm_[dim_] = perm[i];
+      // merge indices if the two consecutive entries are identical
+      while(i+1 < dim && perm[i] + 1 == perm[i+1] 
+            && (outerSizeA == NULL || size[perm[i]] == outerSizeA[perm[i]]) 
+            && (outerSizeB == NULL || size[perm[i]] == outerSizeB[i]) ){ 
+#ifdef DEBUG
+         printf("MERGING indices %d and %d\n",perm[i], perm[i+1]); 
+#endif
+         fusedIndices.push_back( std::make_tuple(perm_[dim_],perm[i+1]) );
+         i++;
+      }
+      dim_++;
+   }
+
+   // correct sizes and outer-sizes
+   for( auto tup : fusedIndices )
+   {
+      size_[std::get<0>(tup)] *= size[std::get<1>(tup)];
+      if( outerSizeA != NULL )
+         outerSizeA_[std::get<0>(tup)] *= outerSizeA[std::get<1>(tup)];
+      if( outerSizeB != NULL ){
+         int pos1 = findPos(std::get<0>(tup), perm, dim);
+         int pos2 = findPos(std::get<1>(tup), perm, dim);
+         outerSizeB_[pos1] *= outerSizeB[pos2];
+      }
+   }
+
+   // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
+   if ( dim_ != dim ) {
+      int currentValue = 0;
+      for(int i=0;i < dim_; ++i){
+         //find smallest element in perm_ and rename it to currentValue
+         int minValue = 1000000;
+         int minPos = -1;
+         for(int pos=0; pos < dim_; ++pos){
+            if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
+               minValue = perm_[pos];
+               minPos = pos;
+            }
+         }
+#ifdef DEBUG
+         printf("perm[%d]: %d -> %d\n",minPos, perm_[minPos], currentValue);
+#endif
+         perm_[minPos] = currentValue; // minValue renamed to currentValue
+         size_[currentValue] = size_[minValue];
+         currentValue++;
+      }
+#ifdef DEBUG
+      printf("perm: ");
+      for(int i=0;i < dim ; ++i)
+         printf("%d ",perm[i]);
+      printf("perm_new: ");
+      for(int i=0;i < dim_ ; ++i)
+         printf("%d ",perm_[i]);
+      printf("sizes_new: ");
+      for(int i=0;i < dim_ ; ++i)
+         printf("%d ",size_[i]);
+#endif
+   }
+
+   return dim_;
+}
+
 node_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size, const int* perm, const int dim)
 {
-   int emitCode = 1; // only for DEBUGGING
+   int emitCode = 0; // only for DEBUGGING
 
-   int errorCode = verifyParameter(size, perm, dim);
+   int errorCode = verifyParameter(size, perm, outerSizeA, outerSizeB, dim);
    if( errorCode > 0 ) {
       printf("Error: %d\n", errorCode);
       exit(-1);
    }
 
-   int lda[dim];
-   int ldb[dim];
-   computeLeadingDimensions( size, perm, dim, outerSizeA, outerSizeB, lda, ldb );
+   int outerSizeA_[dim];
+   int outerSizeB_[dim];
+   int size_[dim];
+   int perm_[dim];
+   int dim_ = fuseIndices(outerSizeA, outerSizeB, size, perm, dim, 
+                          outerSizeA_, outerSizeB_, size_, perm_);
+
+
+   int lda[dim_];
+   int ldb[dim_];
+   computeLeadingDimensions( size_, perm_, dim_, outerSizeA_, outerSizeB_, lda, ldb );
    
    node_t *plan = (node_t*) malloc(sizeof(node_t));
    node_t *currentPtr = plan;
 
-   int posStride1A_inB = findPos(0, perm, dim);
-   int posStride1B_inA = perm[0];
+   int posStride1A_inB = findPos(0, perm_, dim_);
+   int posStride1B_inA = perm_[0];
 
-   if( perm[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
+   if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
 
    // create loops
-   for(int i=0; i < dim; ++i) {
-      int index = perm[dim-1-i]; // loop-order according to: reversed(perm)
+   for(int i=0; i < dim_; ++i) {
+      int index = perm_[dim_-1-i]; // loop-order according to: reversed(perm_)
 
       currentPtr->start = 0;
-      if( index == 0 || index == perm[0] )
+      if( index == 0 || index == perm_[0] )
          currentPtr->inc = 16;
       else
          currentPtr->inc = 1;
-      currentPtr->end = size[index];
+      currentPtr->end = size_[index];
       currentPtr->lda = lda[index];
-      currentPtr->ldb = ldb[findPos(index, perm, dim)];
+      currentPtr->ldb = ldb[findPos(index, perm_, dim_)];
       currentPtr->next = (node_t*) malloc(sizeof(node_t));
 
       if ( emitCode ){
@@ -211,7 +322,7 @@ node_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
          underscores[i+1] = '\0';
 
          printf("for(int i%d = %d; i%d < %d; i%d += %d){\n",index,currentPtr->start,index,currentPtr->end,index,currentPtr->inc);
-         printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm, dim));
+         printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm_, dim_));
       }
 
       currentPtr = currentPtr->next;
@@ -226,12 +337,12 @@ node_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
    currentPtr->next = nullptr;
    if ( emitCode ){
       char underscores[20];
-      for(int j=0;j < dim ; ++j)
+      for(int j=0;j < dim_ ; ++j)
          underscores[j] = '_';
-      underscores[dim] = '\0';
+      underscores[dim_] = '\0';
 
       printf("  sTranspose16x16(A%s, lda%d, B%s, ldb%d, reg_alpha, reg_beta);\n",underscores,posStride1B_inA, underscores, posStride1A_inB);
-      for(int j=0;j < dim ; ++j)
+      for(int j=0;j < dim_ ; ++j)
          printf("  }\n");
    }
 

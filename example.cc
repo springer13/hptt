@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
      for(int i=0;i < nRepeat ; ++i){
         auto begin_time = chrono::high_resolution_clock::now();
         //sTranspose_3210_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
-        sTranspose_3021_96x96x96x96<96,80,64,48>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
+        sTranspose_3021_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
         //sTranspose_210_96x9216x96<96,9216,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
         auto time_diff = chrono::high_resolution_clock::now() - begin_time;
         auto ms = chrono::duration_cast<chrono::milliseconds>(time_diff).count();
@@ -307,7 +307,7 @@ int main(int argc, char *argv[]) {
   trashCache(trash1, trash2, largerThanL3);
   {  // my TTC-C
      int perm_[] = {3,0,2,1};
-     int size_[] = {96,80,64,48}; // ATTENTION: different order than in Tong's code
+     int size_[] = {96,96,96,96}; // ATTENTION: different order than in Tong's code
      int dim_ = 4;
      auto plan = createPlan(NULL, NULL, size_, perm_, dim_);
 
