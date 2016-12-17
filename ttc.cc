@@ -1,13 +1,19 @@
 #include <list>
 #include <tuple>
-#include <omp.h>
+#include <vector>
+#include <algorithm>
+#include <iostream>
 
 #include <stdio.h>
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include <complex.h>
+#include <assert.h>
 
-#include "ttc_c.h"
+#include <omp.h>
+
+#include "ttc.h"
+#include "ttc_utils.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -186,14 +192,87 @@ static INLINE void sTranspose(const float* __restrict__ A, const int lda, float*
 }
 #endif
 
-
-
-int findPos(int value, const int *array, int n)
+void getAvailableParallelism(const std::vector<int> &size, const std::vector<int>&perm, const int dim, const int blocking, std::vector<int> &numTasksPerLoop)
 {
-   for(int i=0;i < n ; ++i)
-      if( array[i] == value )
-         return i;
-   return -1;
+   numTasksPerLoop.resize(dim);
+   for(int loopIdx=0; loopIdx < dim; ++loopIdx){
+      int inc = 1;
+      if( loopIdx == 0 || loopIdx == perm[0] )
+         inc = blocking;
+      numTasksPerLoop[loopIdx] = (size[loopIdx] + inc - 1) / inc;
+      //std::cout << "parallelsim available in loop "<< loopIdx << ": "<<numTasksPerLoop[loopIdx] << std::endl;
+   }
+}
+
+void preferedLoopOrderForParallelization( const std::vector<int> &size, const std::vector<int> &perm, const int dim, std::vector<int> &loopOrder)
+{
+   // prefer non-stride-1 loops for parallelization
+   for(int loopIdx=1; loopIdx < dim; ++loopIdx){
+      if( loopIdx != perm[0] and loopIdx != perm[1] )
+         loopOrder.push_back(loopIdx);
+   }
+   if( size[perm[0]] < 150 )
+   {
+      if( !hasItem(loopOrder, 0) )
+         loopOrder.push_back(0);
+      if( !hasItem(loopOrder, perm[1]) )
+         loopOrder.push_back(perm[1]);
+   } else {
+      if( !hasItem(loopOrder, perm[1]) )
+         loopOrder.push_back(perm[1]);
+      if( !hasItem(loopOrder, 0) )
+         loopOrder.push_back(0);
+   }
+   if( !hasItem(loopOrder, perm[0]) )
+      loopOrder.push_back(perm[0]);
+
+   assert( loopOrder.size() == dim );
+}
+
+void getParallelismStrategy(const std::vector<int> &size, const std::vector<int>&perm, 
+      const int dim, const int numThreads, const int blocking, std::vector<int> &numThreadsAtLoop)
+{
+   std::vector<int> primeFactors;
+   getPrimeFactors( numThreads, primeFactors );
+//   printVector(primeFactors, "primeFactors");
+
+   std::vector<int> numTasksPerLoop;
+   getAvailableParallelism(size, perm, dim, blocking, numTasksPerLoop);
+//   printVector(numTasksPerLoop, "numTasksPerLoop");
+
+   std::vector<int> loopOrder; 
+   preferedLoopOrderForParallelization( size, perm, dim, loopOrder);
+   printVector(loopOrder, "loopOrder");
+
+   numThreadsAtLoop.resize(dim);
+   for(int i=0; i < dim; ++i)
+      numThreadsAtLoop[i] = 1;
+
+   std::vector<int> unmatchedPrimeFactors;
+   for( auto p : primeFactors ) {
+      int done = 0;
+      //find a match for every primefactor
+      for( auto loopIdx : loopOrder ){
+         if( numTasksPerLoop[loopIdx] % p == 0 ){
+            numTasksPerLoop[loopIdx] /= p;
+            numThreadsAtLoop[loopIdx] *= p;
+            done = 1;
+            break;
+         }
+      }
+      if( !done )
+         unmatchedPrimeFactors.push_back(p);
+   }
+   if( unmatchedPrimeFactors.size() > 0 )
+   {
+      printf("unmactched: \n");
+      for( auto p : unmatchedPrimeFactors) 
+         std::cout<< p << " ";
+      std::cout<< "\n";
+      for( auto loopIdx : loopOrder )
+         printf("%d: %d\n",loopIdx , numThreadsAtLoop[loopIdx]); 
+      exit(-1);
+   }
 }
 
 int verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim)
@@ -229,12 +308,12 @@ int verifyParameter(const int *size, const int* perm, const int* outerSizeA, con
    return 0;
 }
 
-void computeLeadingDimensions( const int* size, const int *perm, int dim,
-                               const int *outerSizeA, const int*outerSizeB, 
-                               int *lda, int *ldb )
+void computeLeadingDimensions( const std::vector<int> &size, const std::vector<int> &perm, int dim,
+                               const std::vector<int> &outerSizeA, const std::vector<int> &outerSizeB, 
+                               std::vector<int> &lda, std::vector<int> &ldb )
 {
    lda[0] = 1;
-   if( outerSizeA == NULL || outerSizeA[0] == -1 )
+   if( outerSizeA[0] == -1 )
       for(int i=1;i < dim ; ++i)
          lda[i] = lda[i-1] * size[i-1];
    else
@@ -242,7 +321,7 @@ void computeLeadingDimensions( const int* size, const int *perm, int dim,
          lda[i] = outerSizeA[i-1] * lda[i-1];
 
    ldb[0] = 1;
-   if( outerSizeB == NULL || outerSizeB[0] == -1 )
+   if( outerSizeB[0] == -1 )
       for(int i=1;i < dim ; ++i)
          ldb[i] = ldb[i-1] * size[perm[i-1]];
    else
@@ -251,7 +330,7 @@ void computeLeadingDimensions( const int* size, const int *perm, int dim,
 }
 
 int fuseIndices(const int *outerSizeA, const int *outerSizeB, const int *size, const int* perm, const int dim,
-                 int *outerSizeA_, int *outerSizeB_, int *size_, int* perm_)
+                 std::vector<int> &outerSizeA_, std::vector<int> &outerSizeB_, std::vector<int> &size_, std::vector<int> &perm_)
 {
    // fuses indices whenever possible 
    // For instance:
@@ -338,24 +417,7 @@ int fuseIndices(const int *outerSizeA, const int *outerSizeB, const int *size, c
    return dim_;
 }
 
-void getParallelismStrategy(const int*size, const int*perm, const int* loopOrder, const int dim, const int numThreads, const int blocking, int *parallelismPerLoop)
-{
-   int remainingTasks = numThreads;
-   for(int i=0;i < dim ; ++i){
-      int increment = 1;
-      if( i== 0 || i== perm[0] )
-         increment = blocking;
-      int numParallelismAvailable = (size[i] + increment - 1) / increment;
-      if ( remainingTasks > 1 && numParallelismAvailable % remainingTasks == 0 )
-      {
-         parallelismPerLoop[i] = remainingTasks ; //TODO create thread communicators
-         remainingTasks = 0;
-      }else
-         parallelismPerLoop[i] = 1;
-   }
-}
-
-void getLoopOrder(const int *perm, const int dim, int *loopOrder)
+void getLoopOrder(const std::vector<int> &perm, const int dim, std::vector<int> &loopOrder)
 {
    // TODO use heuristics
    for(int i=0; i < dim; ++i)
@@ -368,26 +430,26 @@ plan_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
 
    int errorCode = verifyParameter(size, perm, outerSizeA, outerSizeB, dim);
    if( errorCode > 0 ) {
-      printf("Error: %d\n", errorCode);
+      printf("Error code: %d\n", errorCode);
       exit(-1);
    }
 
    const int blocking = 32;
-   int outerSizeA_[dim];
-   int outerSizeB_[dim];
-   int size_[dim];
-   int perm_[dim];
+   std::vector<int> outerSizeA_(dim);
+   std::vector<int> outerSizeB_(dim);
+   std::vector<int> size_(dim);
+   std::vector<int> perm_(dim);
    int dim_ = fuseIndices(outerSizeA, outerSizeB, size, perm, dim, 
          outerSizeA_, outerSizeB_, size_, perm_);
 
-   int lda[dim_];
-   int ldb[dim_];
+   std::vector<int> lda(dim_);
+   std::vector<int> ldb(dim_);
    computeLeadingDimensions( size_, perm_, dim_, outerSizeA_, outerSizeB_, lda, ldb );
 
-   int loopOrder[dim_];
+   std::vector<int> loopOrder(dim_);
    getLoopOrder(perm_, dim_, loopOrder);
-   int parallelismPerLoop[dim_];
-   getParallelismStrategy(size_, perm_, loopOrder, dim_, numThreads, blocking, parallelismPerLoop);
+   std::vector<int> numThreadsAtLoop(dim_);
+   getParallelismStrategy(size_, perm_, dim_, numThreads, blocking, numThreadsAtLoop);
 
    plan_t *plan = (plan_t*) malloc(sizeof(plan_t));
    plan->numThreads = numThreads;
@@ -399,11 +461,13 @@ plan_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
       node_t *localPlan = (node_t*) malloc(sizeof(node_t));
       node_t *currentPtr = localPlan;
 
-      int posStride1A_inB = findPos(0, perm_, dim_);
+      int posStride1A_inB = findPos(0, perm_);
       int posStride1B_inA = perm_[0];
 
       if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
 
+      int numThreadsPerComm = numThreads; //global communicator
+      int threadIdComm = threadId;
       // create loops
       for(int i=0; i < dim_; ++i){
          int index = loopOrder[i];
@@ -413,24 +477,25 @@ plan_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
          else
             currentPtr->inc = 1;
 
-         int numThreadsPerLoop = parallelismPerLoop[index];
-         int workPerThread = size_[index] / numThreadsPerLoop;
-         if( size_[index] % numThreadsPerLoop != 0 )
-            printf("ERROR: x\n");
-         
-         printf("loop %d uses %d threads\n",index, numThreadsPerLoop );
+         const int numSubCommunicators = numThreadsAtLoop[index];
 
-         if( numThreadsPerLoop > 1 ){ //TODO only works if all threads parallelize across one loop
-            if(  numThreadsPerLoop != numThreads )
-               printf("ERROR: threads need to parallelize across one loop\n");
-            currentPtr->start = threadId * workPerThread;
-            currentPtr->end = MIN( size_[index], (threadId+1) * workPerThread );
-         }else{
-            currentPtr->start = 0;
-            currentPtr->end = size_[index];
+         const int numParallelismAvailable = (size_[index] + currentPtr->inc - 1) / currentPtr->inc;
+         const int workPerThread = numParallelismAvailable / numSubCommunicators;
+         
+         numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
+         const int commId = (threadIdComm/numThreadsPerComm);
+         threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
+         if( numParallelismAvailable  % numSubCommunicators != 0 ){
+            printf("ERROR: TODO: parallelism not devisible\n");
+            exit(-1);
          }
+         printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
+
+         currentPtr->start = commId * workPerThread * currentPtr->inc;
+         currentPtr->end = MIN( size_[index], (commId+1) * workPerThread * currentPtr->inc );
+
          currentPtr->lda = lda[index];
-         currentPtr->ldb = ldb[findPos(index, perm_, dim_)];
+         currentPtr->ldb = ldb[findPos(index, perm_)];
          currentPtr->next = (node_t*) malloc(sizeof(node_t));
 
          if ( emitCode ){
@@ -444,7 +509,7 @@ plan_t* createPlan(const int *outerSizeA, const int *outerSizeB, const int *size
             underscores[i+1] = '\0';
 
             printf("for(int i%d = %d; i%d < %d; i%d += %d){\n",index,currentPtr->start,index,currentPtr->end,index,currentPtr->inc);
-            printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm_, dim_));
+            printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm_));
          }
 
          currentPtr = currentPtr->next;
@@ -488,9 +553,6 @@ void ttc_sTranspose_int( const float* __restrict__ A, float* __restrict__ B, con
       sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
 }
 
-/**
- * B(i2,i1,i0) <- alpha * A(i0,i1,i2) + beta * B(i2,i1,i0);
- */
 void ttc_sTranspose( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, plan_t* plan)
 {
    //broadcast reg_alpha
@@ -502,8 +564,3 @@ void ttc_sTranspose( const float* __restrict__ A, float* __restrict__ B, const f
    ttc_sTranspose_int( A, B, reg_alpha, reg_beta, plan->localPlans[omp_get_thread_num()] );
 }
 
-void trashCache(double *A, double *B, int n)
-{
-   for(int i = 0; i < n; i++)
-      A[i] += 0.999 * B[i];
-}

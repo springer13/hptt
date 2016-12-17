@@ -8,7 +8,8 @@
 #include <omp.h>
 #include <stdlib.h>
 
-#include "ttc_c.h"
+#include "ttc.h"
+
 #include "sTranspose_210_384x2320x64.h"
 #include "sTranspose_210_96x9216x96.h"
 #include "sTranspose_3210_96x96x96x96.h"
