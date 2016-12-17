@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         sTranspose_210_384x2320x64<384,2320,64>( inst.input_data, B_ttc, alpha, beta, NULL, NULL);
         double elapsed_time = omp_get_wtime() - begin_time;
@@ -248,13 +248,13 @@ int main(int argc, char *argv[]) {
      int perm_[] = {2,1,0};
      int size_[] = {384,2320,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 3;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
+     auto plan = ttc::createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
-        ttc_sTranspose(inst.input_data, B_copy, alpha, beta, plan);
+        ttc::sTranspose(inst.input_data, B_copy, alpha, beta, plan);
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
@@ -266,7 +266,7 @@ int main(int argc, char *argv[]) {
   {  //ttc-c-tong
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         inst.exec();
         double elapsed_time = omp_get_wtime() - begin_time;
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         //sTranspose_3210_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
         sTranspose_3021_96x96x96x96<96,96,96,96>(inst4.input_data, B_ttc, alpha, beta, NULL, NULL);
@@ -314,13 +314,13 @@ int main(int argc, char *argv[]) {
      int perm_[] = {3,0,2,1};
      int size_[] = {96,96,96,96}; // ATTENTION: different order than in Tong's code
      int dim_ = 4;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
+     auto plan = ttc::createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
-        ttc_sTranspose(inst4.input_data, B_copy, alpha, beta, plan);
+        ttc::sTranspose(inst4.input_data, B_copy, alpha, beta, plan);
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
   {  // Tong's TTC-C
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         inst4.exec();
         double elapsed_time = omp_get_wtime() - begin_time;
@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         sTranspose_43210_64x64x64x64x64<64,64,64,64,64>(inst5.input_data, B_ttc, alpha, beta, NULL, NULL);
         double elapsed_time = omp_get_wtime() - begin_time;
@@ -380,13 +380,13 @@ int main(int argc, char *argv[]) {
      int perm_[] = {4,3,2,1,0};
      int size_[] = {64,64,64,64,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 5;
-     auto plan = createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
+     auto plan = ttc::createPlan(NULL, NULL, size_, perm_, dim_, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
-        ttc_sTranspose(inst5.input_data, B_copy, alpha, beta, plan);
+        ttc::sTranspose(inst5.input_data, B_copy, alpha, beta, plan);
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
@@ -397,7 +397,7 @@ int main(int argc, char *argv[]) {
   {  // tong
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        trashCache(trash1, trash2, largerThanL3);
+        ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         inst5.exec();
         double elapsed_time = omp_get_wtime() - begin_time;
