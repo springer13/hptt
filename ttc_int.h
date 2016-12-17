@@ -42,5 +42,10 @@ void getLoopOrder(const std::vector<int> &perm, const int dim, std::vector<int> 
 
 void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const __m256 alpha, const __m256 beta, const node_t* plan);
 
+void createPlans(const std::vector<int> &outerSizeA, const std::vector<int> &outerSizeB, const std::vector<int> &size, 
+                 const std::vector<int> &perm, const int dim, int numThreads, std::vector<plan_t*> &plans);
+
+plan_t* selectPlan(std::vector<plan_t*> &plans);
+
 }
 

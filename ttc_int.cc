@@ -415,5 +415,113 @@ void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const _
       sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
 }
 
+void createPlans(const std::vector<int> &outerSizeA, const std::vector<int> &outerSizeB, const std::vector<int> &size, 
+                 const std::vector<int> &perm, const int dim, const int numThreads, std::vector<plan_t*> &plans)
+{
+   int emitCode = 0; // only for DEBUGGING
+
+   const int blocking = 32;
+   std::vector<int> lda(dim);
+   std::vector<int> ldb(dim);
+   computeLeadingDimensions( size, perm, dim, outerSizeA, outerSizeB, lda, ldb );
+   std::vector<int> numThreadsAtLoop(dim);
+   getParallelismStrategy(size, perm, dim, numThreads, blocking, numThreadsAtLoop);
+
+   std::vector<int> loopOrder(dim);
+   getLoopOrder(perm, dim, loopOrder);
+
+   plan_t *plan = (plan_t*) malloc(sizeof(plan_t));
+   plan->numThreads = numThreads;
+   plan->localPlans = (node_t **) malloc(sizeof(node_t*) * numThreads);
+
+#pragma omp parallel num_threads(numThreads)
+   {
+      int threadId = omp_get_thread_num();
+      node_t *localPlan = (node_t*) malloc(sizeof(node_t));
+      node_t *currentPtr = localPlan;
+
+      int posStride1A_inB = findPos(0, perm);
+      int posStride1B_inA = perm[0];
+
+      if( perm[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
+
+      int numThreadsPerComm = numThreads; //global communicator
+      int threadIdComm = threadId;
+      // create loops
+      for(int i=0; i < dim; ++i){
+         int index = loopOrder[i];
+
+         if( index == 0 || index == perm[0] )
+            currentPtr->inc = blocking;
+         else
+            currentPtr->inc = 1;
+
+         const int numSubCommunicators = numThreadsAtLoop[index];
+
+         const int numParallelismAvailable = (size[index] + currentPtr->inc - 1) / currentPtr->inc;
+         const int workPerThread = numParallelismAvailable / numSubCommunicators;
+         
+         numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
+         const int commId = (threadIdComm/numThreadsPerComm);
+         threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
+         if( numParallelismAvailable  % numSubCommunicators != 0 ){
+            printf("ERROR: TODO: parallelism not devisible\n");
+            exit(-1);
+         }
+         //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
+
+         currentPtr->start = commId * workPerThread * currentPtr->inc;
+         currentPtr->end = std::min( size[index], (commId+1) * workPerThread * currentPtr->inc );
+
+         currentPtr->lda = lda[index];
+         currentPtr->ldb = ldb[findPos(index, perm)];
+         currentPtr->next = (node_t*) malloc(sizeof(node_t));
+
+         if ( emitCode ){
+            char underscores_old[10];
+            for(int j=0;j < i ; ++j)
+               underscores_old[j] = '_';
+            underscores_old[i] = '\0';
+            char underscores[10];
+            for(int j=0;j <= i ; ++j)
+               underscores[j] = '_';
+            underscores[i+1] = '\0';
+
+            printf("for(int i%d = %d; i%d < %d; i%d += %d){\n",index,currentPtr->start,index,currentPtr->end,index,currentPtr->inc);
+            printf("  const float *A%s = &A%s[i%d * lda%d]; float *B%s = &B%s[i%d * ldb%d];\n",underscores,underscores_old,index,index,underscores,underscores_old,index,findPos(index, perm));
+         }
+
+         currentPtr = currentPtr->next;
+      }
+
+      //macro-kernel
+      currentPtr->start = -1;
+      currentPtr->end = -1;
+      currentPtr->inc = -1;
+      currentPtr->lda = lda[ posStride1B_inA ];
+      currentPtr->ldb = ldb[ posStride1A_inB ];
+      currentPtr->next = nullptr;
+      if ( emitCode ){
+         char underscores[20];
+         for(int j=0;j < dim ; ++j)
+            underscores[j] = '_';
+         underscores[dim] = '\0';
+
+         printf("  sTranspose16x16(A%s, lda%d, B%s, ldb%d, reg_alpha, reg_beta);\n",underscores,posStride1B_inA, underscores, posStride1A_inB);
+         for(int j=0;j < dim ; ++j)
+            printf("  }\n");
+      }
+      plan->localPlans[omp_get_thread_num()] = localPlan;
+   }
+
+   plans.push_back(plan);
+}
+
+plan_t* selectPlan(std::vector<plan_t*> &plans)
+{
+   return plans[0]; // TODO
+}
+
+
 }
 
