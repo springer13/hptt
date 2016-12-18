@@ -184,6 +184,13 @@ void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const _
       sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
 }
 
+void Transpose::trashCaches()
+{
+#pragma omp parallel for num_threads(numThreads_)
+   for(int i=0;i < trashSize_ ; ++i){
+      trash1_[i] += 1.01 * trash2_[i];
+   }
+}
 void Transpose::createPlan()
 {
    std::vector<ComputeNode*> allPlans;
@@ -191,14 +198,29 @@ void Transpose::createPlan()
 
    rootNodes_ = selectPlan( allPlans );
    
-//   //delete all other plans
-//   for( int i=0; i < plans.size; i++ ){
-//      if( plans[i] != bestPlan )
-//      {
-//         delete plans[i];
-//         plans[i] = nullptr;
-//      }
-//   }
+   //delete all other plans
+   for( int i=0; i < allPlans.size(); i++ ){
+      if( allPlans[i] != nullptr && allPlans[i] != rootNodes_ )
+      {
+         delete[] allPlans[i];
+         allPlans[i] = nullptr;
+      }
+   }
+}
+void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
+{
+   if( rootNodes == nullptr ) {
+      printf("ERROR: plan has not yet been created.\n");
+      exit(-1);
+   }
+   
+   //broadcast reg_alpha
+   __m256 reg_alpha = _mm256_set1_ps(0.0); // do not alter the content of B
+   //broadcast reg_beta
+   __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
+
+#pragma omp parallel num_threads(numThreads_)
+   sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
 }
 
 void Transpose::execute() noexcept
@@ -256,6 +278,13 @@ void Transpose::preferedLoopOrderForParallelization( std::vector<int> &loopOrder
 
 void Transpose::getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const
 {
+   numThreadsAtLoop.resize(dim_, 1);
+   for( int i = 0; i < dim_; i++ ) //BUGFIX, this is requriered for whatever reason
+      numThreadsAtLoop[i] = 1;
+   printVector<int>(numThreadsAtLoop, "numThreadsAtLoop");
+   if( numThreads_ == 1 )
+      return;
+
    std::vector<int> primeFactors;
    getPrimeFactors( numThreads_, primeFactors );
    printVector(primeFactors , "primeFactors");
@@ -267,11 +296,6 @@ void Transpose::getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const
    std::vector<int> loopOrder; 
    this->preferedLoopOrderForParallelization( loopOrder );
    printVector(loopOrder, "loopOrder");
-
-   numThreadsAtLoop.resize(dim_, 1);
-   for( int i = 0; i < dim_; i++ ) //BUGFIX, this is requriered for whatever reason
-      numThreadsAtLoop[i] = 1;
-   printVector<int>(numThreadsAtLoop, "numThreadsAtLoop");
 
    std::vector<int> unmatchedPrimeFactors;
    for( auto p : primeFactors ) {
@@ -450,11 +474,21 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
    }
 }
 
-void Transpose::getLoopOrder(std::vector<int> &loopOrder) const
+void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
-   // TODO use heuristics
-   for(int i=0; i < dim_; ++i)
-      loopOrder[i] = perm_[dim_-1-i]; // loop-order according to: reversed(perm_)
+   //TODO LOOP HEURISTIC
+   {
+      std::vector<int> loopOrder(dim_);
+      for(int i=0; i < dim_; ++i)
+         loopOrder[i] = perm_[dim_-1-i]; // loop-order according to: reversed(perm_)
+      loopOrders.push_back(loopOrder);
+   }
+   {
+      std::vector<int> loopOrder(dim_);
+      for(int i=0; i < dim_; ++i)
+         loopOrder[i] = dim_-1-i; 
+      loopOrders.push_back(loopOrder);
+   }
 }
 
 void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
@@ -463,112 +497,159 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
    this->getParallelismStrategy( numThreadsAtLoop );
    printVector(numThreadsAtLoop , "numThreadsAtLoop");
 
-   std::vector<int> loopOrder(dim_);
-   this->getLoopOrder(loopOrder);
+   std::vector<std::vector<int> > loopOrders;
+   this->getLoopOrders(loopOrders);
 
-   ComputeNode *rootNodes = new ComputeNode[numThreads_];
+   for( auto loopOrder : loopOrders)
+   {
+      ComputeNode *rootNodes = new ComputeNode[numThreads_];
 
 #pragma omp parallel num_threads(numThreads_)
-   {
-      int threadId = omp_get_thread_num();
-      ComputeNode *currentNode = &rootNodes[threadId];
+      {
+         int threadId = omp_get_thread_num();
+         ComputeNode *currentNode = &rootNodes[threadId];
 
-      int posStride1A_inB = findPos(0, perm_);
-      int posStride1B_inA = perm_[0];
+         int posStride1A_inB = findPos(0, perm_);
+         int posStride1B_inA = perm_[0];
 
-      if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
+         if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
 
-      int numThreadsPerComm = numThreads_; //global communicator
-      int threadIdComm = threadId;
-      // create loops
-      for(int i=0; i < dim_; ++i){
-         int index = loopOrder[i];
+         int numThreadsPerComm = numThreads_; //global communicator
+         int threadIdComm = threadId;
+         // create loops
+         for(int i=0; i < dim_; ++i){
+            int index = loopOrder[i];
 
-         if( index == 0 || index == perm_[0] )
-            currentNode->inc = blocking_;
-         else
-            currentNode->inc = 1;
+            if( index == 0 || index == perm_[0] )
+               currentNode->inc = blocking_;
+            else
+               currentNode->inc = 1;
 
-         const int numSubCommunicators = numThreadsAtLoop[index];
+            const int numSubCommunicators = numThreadsAtLoop[index];
 
-         const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
-         const int workPerThread = numParallelismAvailable / numSubCommunicators;
-         
-         numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
-         const int commId = (threadIdComm/numThreadsPerComm);
-         threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
-         if( numParallelismAvailable  % numSubCommunicators != 0 ){
-            printf("ERROR: TODO: parallelism not devisible\n");
-            exit(-1);
+            const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
+            const int workPerThread = numParallelismAvailable / numSubCommunicators;
+
+            numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
+            const int commId = (threadIdComm/numThreadsPerComm);
+            threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
+            if( numParallelismAvailable  % numSubCommunicators != 0 ){
+               printf("ERROR: TODO: parallelism not devisible\n");
+               exit(-1);
+            }
+            //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
+
+            currentNode->start = commId * workPerThread * currentNode->inc;
+            currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
+
+            currentNode->lda = lda_[index];
+            currentNode->ldb = ldb_[findPos(index, perm_)];
+            currentNode->next = new ComputeNode;
+
+            currentNode = currentNode->next;
          }
-         //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
 
-         currentNode->start = commId * workPerThread * currentNode->inc;
-         currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
-
-         currentNode->lda = lda_[index];
-         currentNode->ldb = ldb_[findPos(index, perm_)];
-         currentNode->next = new ComputeNode;
-
-         currentNode = currentNode->next;
+         //macro-kernel
+         currentNode->start = -1;
+         currentNode->end = -1;
+         currentNode->inc = -1;
+         currentNode->lda = lda_[ posStride1B_inA ];
+         currentNode->ldb = ldb_[ posStride1A_inB ];
+         currentNode->next = nullptr;
       }
-
-      //macro-kernel
-      currentNode->start = -1;
-      currentNode->end = -1;
-      currentNode->inc = -1;
-      currentNode->lda = lda_[ posStride1B_inA ];
-      currentNode->ldb = ldb_[ posStride1A_inB ];
-      currentNode->next = nullptr;
+      plans.push_back(rootNodes);
    }
-   plans.push_back(rootNodes);
 }
 
 /**
  * Estimates the time in seconds for the given computeTree
  */
-float Transpose::estimateExecutionTime( const ComputeNode *rootNodes ) const
+float Transpose::estimateExecutionTime( const ComputeNode *rootNodes )
 {
-   double elementsPerTensor = 1;
-   for( auto s : sizeA_ )
-      elementsPerTensor *= s;
+   this->trashCaches();
 
-   float bandwidth = 12 * numThreads_; // in GiB/s
-   float dataTotal = 3 * elementsPerTensor * sizeof(float) / 1024./1024./1024.;
-   float estimatedTime = dataTotal / bandwidth;
+   double startTime = omp_get_wtime();
+   this->executeEstimate(rootNodes);
+   double elapsedTime = omp_get_wtime() - startTime;
 
-   int timeLimit = 0; //in seconds
+   const double minMeasurementTime = 0.1; // in seconds
+
+   // do aleast 3 repetitions or spent at least 'minMeasurementTime' seconds for each candidate
+   int nRepeat = std::min(3, (int) std::ceil(minMeasurementTime / elapsedTime));
+
+   //execute just a few iterations and exterpolate the result
+   startTime = omp_get_wtime();
+   for(int i=0;i < nRepeat ; ++i) //ATTENTION: we are not clearing the caches inbetween runs
+      this->executeEstimate( rootNodes );
+   elapsedTime = omp_get_wtime() - startTime;
+   elapsedTime /= nRepeat;
+
+   printf("Estimated time: %.3e ms.\n",elapsedTime * 1000); 
+   return elapsedTime; 
+}
+
+double Transpose::getTimeLimit() const
+{
    if( selectionMethod_ == ESTIMATE )
-      timeLimit = 0;
+      return 0.0;
    else if( selectionMethod_ == MEASURE)
-      timeLimit = 10;   // 10s
+      return 10.;   // 10s
    else if( selectionMethod_ == PATIENT)
-      timeLimit = 60;   // 1m
+      return 60.;   // 1m
    else if( selectionMethod_ == CRAZY )
-      timeLimit = 3600; // 1h
+      return 3600.; // 1h
    else{
       printf("ERROR: sectionMethod unknown.\n");
       exit(-1);
    }
-   //TODO
-   //execute just a few iterations and exterpolate the result
-
-   return estimatedTime; 
+   return -1;
 }
 
-ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans) const
+ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
 {
+   if( plans.size() <= 0 ){
+      printf("Internal error: not enough plans generated.\n");
+      exit(-1);
+   }
+
+   double timeLimit = this->getTimeLimit(); //in seconds
+
    float minTime = FLT_MAX;
-   ComputeNode* bestPlan = nullptr;
-   for( auto p : plans ){
-      float estimatedTime = this->estimateExecutionTime( p );
-      if( estimatedTime < minTime ){
-         bestPlan = p;
-         minTime = estimatedTime;
+   ComputeNode* bestPlan = plans[0];
+
+   if( plans.size() > 1 )
+   {
+      double startTime = omp_get_wtime();
+      for( auto p : plans )
+      {
+         if( omp_get_wtime() - startTime >= timeLimit ) // timelimit reached
+            break;
+
+         float estimatedTime = this->estimateExecutionTime( p );
+
+         if( estimatedTime < minTime ){
+            bestPlan = p;
+            minTime = estimatedTime;
+         }
       }
    }
    return bestPlan;
 }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
      int perm_[] = {2,1,0};
      int size_[] = {384,2320,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 3;
-     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst.input_data, alpha, B_copy, beta, ttc::ESTIMATE, numThreads );
+     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst.input_data, alpha, B_copy, beta, ttc::MEASURE, numThreads );
      transpose.createPlan();
 
      double minTime = 1e200;
@@ -315,7 +315,7 @@ int main(int argc, char *argv[]) {
      int perm_[] = {3,0,2,1};
      int size_[] = {96,96,96,96}; // ATTENTION: different order than in Tong's code
      int dim_ = 4;
-     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst4.input_data, alpha, B_copy, beta, ttc::ESTIMATE, numThreads );
+     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst4.input_data, alpha, B_copy, beta, ttc::MEASURE, numThreads );
      transpose.createPlan();
 
      double minTime = 1e200;
@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
      int perm_[] = {4,3,2,1,0};
      int size_[] = {64,64,64,64,64}; // ATTENTION: different order than in Tong's code
      int dim_ = 5;
-     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst5.input_data, alpha, B_copy, beta, ttc::ESTIMATE, numThreads );
+     ttc::Transpose transpose( size_, perm_, NULL, NULL, dim_, inst5.input_data, alpha, B_copy, beta, ttc::MEASURE, numThreads );
      transpose.createPlan();
 
      double minTime = 1e200;

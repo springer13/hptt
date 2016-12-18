@@ -1,7 +1,12 @@
 #ifndef TTC_C_H
 #define TTC_C_H
 
+#include <stdio.h>
+
 namespace ttc {
+
+extern float *trash1, *trash2;
+extern int trashSize;
 
 class ComputeNode{
    public:
@@ -47,7 +52,9 @@ class Transpose{
          dim_(-1),
          numThreads_(numThreads), 
          rootNodes_(nullptr),
-         blocking_(32), 
+         blocking_(32),
+         trash1_(nullptr),
+         trash2_(nullptr),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);
@@ -64,12 +71,26 @@ class Transpose{
 
          // initializes lda_ and ldb_
          computeLeadingDimensions();
+
+         trashSize_ = 42 * 1024 * 1024 / sizeof(float); //42 MiB
+         trash1_ = new float[trashSize_];
+         trash2_ = new float[trashSize_];
+
+#pragma omp parallel for num_threads(numThreads_)
+         for(int i=0;i < trashSize_ ; ++i){
+            trash1_[i] = (((i+1) * 13) % 10000) / 10000.;
+            trash2_[i] = (((i+1) * 13) % 10000) / 10000.;
+         }
       }
 
       ~Transpose() { 
          if ( rootNodes_ != nullptr ){
             delete[] rootNodes_;
          }
+         if( trash1_ != nullptr )
+            delete[] trash1_;
+         if( trash2_ != nullptr )
+            delete[] trash2_;
       }
 
       /***************************************************
@@ -94,19 +115,22 @@ class Transpose{
        * Private Methods
        ***************************************************/
       void createPlans( std::vector<ComputeNode*> &plans ) const;
-      ComputeNode* selectPlan( const std::vector<ComputeNode*> &plans ) const;
+      ComputeNode* selectPlan( const std::vector<ComputeNode*> &plans );
       void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
       void computeLeadingDimensions();
+      void trashCaches();
 
       /***************************************************
        * Helper Methods
        ***************************************************/
-      float estimateExecutionTime( const ComputeNode *rootNodes ) const; //execute just a few iterations and exterpolate the result
+      float estimateExecutionTime( const ComputeNode *rootNodes ); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
-      void getLoopOrder(std::vector<int> &loopOrder) const;
+      void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
       void getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const;
       void preferedLoopOrderForParallelization( std::vector<int> &loopOrder ) const;
       void getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const;
+      void executeEstimate(const ComputeNode *rootNodes) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
+      double getTimeLimit() const;
 
       const float* __restrict__ A_;
       float* __restrict__ B_;
@@ -124,6 +148,9 @@ class Transpose{
       ComputeNode *rootNodes_; //one for each thread
       SelectionMethod selectionMethod_;
       int blocking_;
+
+      float *trash1_, *trash2_;
+      int trashSize_;
 };
 
 
