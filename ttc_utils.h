@@ -32,6 +32,7 @@ int findPos(t value, const std::vector<t> &array)
 
 int findPos(int value, const int *array, int n);
 
+int factorial(int n);
 }
 
 #endif

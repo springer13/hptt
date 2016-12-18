@@ -474,21 +474,63 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
    }
 }
 
+double Transpose::loopCostHeuristic( const std::vector<int> &loopOrder ) const
+{
+   // penalize different loop-oders differently
+   double loopPenalty[dim_];
+   loopPenalty[dim_-1] = 0;
+   double penalty = 10;
+   for(int i=dim_ - 2;i >= 0; i--){
+      loopPenalty[i] = penalty;
+      penalty *= 2;
+   }
+   // loopPenalty looks like this: [...,40,20,10,0]
+   // Rationale: as inner-most indices move towards the outer-most loops, they
+   // should be penalized more
+
+   double loopCost = 0.0;
+   double importance = 1.0;
+   for(int i=0;i < dim_ ; ++i){
+      int posA = findPos(i, loopOrder);
+      int posB = findPos(perm_[i], loopOrder);
+      loopCost += (loopPenalty[posA] + loopPenalty[posB] * 1.01 ) * importance; // B is slighly more important than A
+      importance /= 2; // indices become less and less important as we go towards the outer-most indices
+   }
+
+   return loopCost;
+}
+
 void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
-   //TODO LOOP HEURISTIC
-   {
-      std::vector<int> loopOrder(dim_);
-      for(int i=0; i < dim_; ++i)
-         loopOrder[i] = perm_[dim_-1-i]; // loop-order according to: reversed(perm_)
+   loopOrders.clear();
+   std::vector<int> loopOrder;
+   for(int i = 0; i < dim_; i++)
+      loopOrder.push_back(i);
+
+   // create all loopOrders
+   do {
       loopOrders.push_back(loopOrder);
+   } while(std::next_permutation(loopOrder.begin(), loopOrder.end()));
+
+
+   // sort according to loop heuristic
+   std::sort(loopOrders.begin(), loopOrders.end(), 
+         [this](const std::vector<int> loopOrder1, const std::vector<int> loopOrder2)
+         { 
+            return this->loopCostHeuristic(loopOrder1) < this->loopCostHeuristic(loopOrder2); 
+         });
+
+   if( loopOrders.size() != factorial(dim_) ){
+      printf("Internal error: number of loop-orders incorrect.\n");
+      exit(-1);
    }
+#ifdef DEBUG
+   for(auto loopOrder : loopOrders)
    {
-      std::vector<int> loopOrder(dim_);
-      for(int i=0; i < dim_; ++i)
-         loopOrder[i] = dim_-1-i; 
-      loopOrders.push_back(loopOrder);
+      printVector(loopOrder,"loop");
+      printf("penalty: %f\n",loopCostHeuristic(loopOrder));
    }
+#endif
 }
 
 void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
@@ -584,7 +626,9 @@ float Transpose::estimateExecutionTime( const ComputeNode *rootNodes )
    elapsedTime = omp_get_wtime() - startTime;
    elapsedTime /= nRepeat;
 
+#ifdef DEBUG
    printf("Estimated time: %.3e ms.\n",elapsedTime * 1000); 
+#endif
    return elapsedTime; 
 }
 

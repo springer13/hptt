@@ -119,6 +119,7 @@ class Transpose{
       void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
       void computeLeadingDimensions();
       void trashCaches();
+      double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
 
       /***************************************************
        * Helper Methods

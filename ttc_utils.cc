@@ -33,4 +33,9 @@ void trashCache(double *A, double *B, int n)
       A[i] += 0.999 * B[i];
 }
 
+int factorial(int n){
+   if( n == 1 ) return 1;
+   return n * factorial(n-1);
+}
+
 }
