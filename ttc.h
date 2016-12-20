@@ -56,6 +56,7 @@ class Transpose{
          numThreads_(numThreads), 
          rootNodes_(nullptr),
          blocking_(32),
+         blocking_constStride1_(1), //TODO
          trash1_(nullptr),
          trash2_(nullptr),
          infoLevel_(1),
@@ -159,6 +160,7 @@ class Transpose{
       ComputeNode *rootNodes_; //one for each thread
       SelectionMethod selectionMethod_;
       int blocking_;
+      int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
       float *trash1_, *trash2_;
       int trashSize_;

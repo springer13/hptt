@@ -28,7 +28,7 @@ void equal_(const float *A, const float*B, int total_size){
       if(diff > 0){
          double relError = (diff / max);
          if(relError > 4e-5){
-            //printf("i: %d relError: %.8e\n",i,relError);
+//            printf("i: %d relError: %.8e %.8e %.8e\n",i,relError, Atmp[i], Btmp[i]);
             error += 1;
          }
       }
@@ -51,8 +51,8 @@ int main(int argc, char *argv[])
   if( getenv("OMP_NUM_THREADS") != NULL )
      numThreads = atoi(getenv("OMP_NUM_THREADS"));
   printf("numThreads: %d\n",numThreads);
-  float alpha = 2.1;
-  float beta = 4.0;
+  float alpha = 2.2;
+  float beta = 4.1;
 
   if( argc < 2 ){
      printf("Usage: <dim> <permutation each index separated by ' '> <size of each index separated by ' '>\n");
@@ -109,10 +109,10 @@ int main(int argc, char *argv[])
   // initialize data
 #pragma omp parallel for
   for(int i=0;i < total_size; ++i)
-     A[i] = (((i+1)*13 % 10000) - 5000.) / 10000.;
+     A[i] = (((i+1)*13 % 100) - 50.) / 100.;
 #pragma omp parallel for
   for(int i=0;i < total_size ; ++i){
-     B[i] = (((i+1)*17 % 10000) - 5000.) / 10000.;
+     B[i] = (((i+1)*17 % 100) - 50.) / 100.;
      B_copy[i] = B[i];
      B_ttc[i] = B[i];
   }
@@ -146,6 +146,8 @@ int main(int argc, char *argv[])
      }
      printf("TTC (paul): %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
+
+ 
   { // original ttc
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){

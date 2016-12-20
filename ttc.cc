@@ -1,4 +1,5 @@
 #include <tuple>
+#include <string>
 #include <vector>
 #include <list>
 #include <algorithm>
@@ -185,10 +186,47 @@ void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const _
       sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
 }
 
+void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, const ComputeNode* plan)
+{
+   const int end = plan->end - (plan->inc - 1);
+   const int inc = plan->inc;
+   const int lda_ = plan->lda;
+   const int ldb_ = plan->ldb;
+
+   if( plan->next != nullptr )
+      for(int i = plan->start; i < end; i+= inc)
+         // recurse
+         sTranspose_int_constStride1( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+   else 
+      for(int i = plan->start; i < end; i+= inc)
+         B[i] = alpha * A[i] + beta * B[i];
+}
+
+// prints a plan
+void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __restrict__ B, const ComputeNode* plan, int level)
+{
+   const int end = plan->end - (plan->inc - 1);
+   const int inc = plan->inc;
+   const int lda_ = plan->lda;
+   const int ldb_ = plan->ldb;
+
+   if( plan->next != nullptr ){
+      printf("for(int i%d = %d; i%d < %d; i%d+= %d){ //lda: %d ldb: %d \n", level, plan->start, level, end, level, inc, lda_, ldb_);
+      printf("float *A_ = &A[i%d * %d];\n", level, lda_);
+      printf("float *B_ = &B[i%d * %d];\n", level, ldb_);
+      // recurse
+      sTranspose_int_constStride1_print( A, B, plan->next, level+1);
+   } else { 
+      printf("for(int k = %d; k < %d; k+= %d) //lda: %d ldb: %d \n", plan->start, end, inc, lda_, ldb_);
+      printf("    B[k] = beta * B[k] + alpha * A[k];\n");
+   }
+   printf("}\n");
+}
+
 void Transpose::trashCaches()
 {
 #pragma omp parallel for num_threads(numThreads_)
-   for(int i=0;i < trashSize_ ; ++i){
+   for(int i=0; i < trashSize_ ; ++i){
       trash1_[i] += 1.01 * trash2_[i];
    }
 }
@@ -215,13 +253,19 @@ void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
       exit(-1);
    }
    
-   //broadcast reg_alpha
-   __m256 reg_alpha = _mm256_set1_ps(0.0); // do not alter the content of B
-   //broadcast reg_beta
-   __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
+   if ( perm_[0] != 0 )
+   {
+      //broadcast reg_alpha
+      __m256 reg_alpha = _mm256_set1_ps(0.0); // do not alter the content of B
+      //broadcast reg_beta
+      __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
 
 #pragma omp parallel num_threads(numThreads_)
-   sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+      sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+   } else {
+#pragma omp parallel num_threads(numThreads_)
+      sTranspose_int_constStride1( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+   }
 }
 
 void Transpose::execute() noexcept
@@ -231,13 +275,21 @@ void Transpose::execute() noexcept
       exit(-1);
    }
    
-   //broadcast reg_alpha
-   __m256 reg_alpha = _mm256_set1_ps(alpha_);
-   //broadcast reg_beta
-   __m256 reg_beta = _mm256_set1_ps(beta_);
+   if ( perm_[0] != 0 )
+   {
+      //broadcast reg_alpha
+      __m256 reg_alpha = _mm256_set1_ps(alpha_);
+      //broadcast reg_beta
+      __m256 reg_beta = _mm256_set1_ps(beta_);
 
 #pragma omp parallel num_threads(numThreads_)
-   sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+      sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+   } else {
+#pragma omp parallel num_threads(numThreads_)
+      sTranspose_int_constStride1( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+//      sTranspose_int_constStride1_print( A_, B_, &rootNodes_[omp_get_thread_num()], 0);
+//      exit(-1);
+   }
 }
 
 void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const
@@ -245,10 +297,15 @@ void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) con
    numTasksPerLoop.resize(dim_);
    for(int loopIdx=0; loopIdx < dim_; ++loopIdx){
       int inc = 1;
-      if( loopIdx == 0 || loopIdx == perm_[0] )
-         inc = blocking_;
+      if( perm_[0] != 0 )
+      {
+         if( loopIdx == 0 || loopIdx == perm_[0] )
+            inc = blocking_;
+      } else {
+         if( loopIdx == 1 || loopIdx == perm_[1] )
+            inc = blocking_constStride1_;
+      }
       numTasksPerLoop[loopIdx] = (sizeA_[loopIdx] + inc - 1) / inc;
-      //std::cout << "parallelsim available in loop "<< loopIdx << ": "<<numTasksPerLoop[loopIdx] << std::endl;
    }
 }
 
@@ -312,11 +369,13 @@ double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedPara
 void Transpose::getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const
 {
    parallelismStrategies.clear();
-   if( numThreads_ == 1 )
+   if( numThreads_ == 1 ){
       parallelismStrategies.push_back(std::vector<int>(dim_, 1));
+      return;
+   }
 
    // ATTENTION: we don't care about the case where numThreads_ is a large prime number!!!
-   // (yes, that inclues KNC)
+   // (sorry, KNC)
    //
    // we factorize numThreads into its prime factors because we have to match
    // every one to a certain loop. In principle every loop could be used to
@@ -501,6 +560,10 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
          printf("%d ",sizeA_[i]);
 #endif
    }
+   if( dim_ < 2 || (dim_ == 2 && perm_[0] == 0) ){
+      printf("TODO: support dimension too small: map to copy()\n");
+      exit(-1);
+   }
 }
 
 double Transpose::loopCostHeuristic( const std::vector<int> &loopOrder ) const
@@ -538,6 +601,9 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 
    // create all loopOrders
    do {
+      if ( perm_[0] == 0 && loopOrder[dim_-1] != 0 )
+         continue; // ATTENTION: we skipp all loop-orders where the stride-1 index is not the inner-most loop iff perm[0] == 0 (both for perf & correctness)
+
       loopOrders.push_back(loopOrder);
    } while(std::next_permutation(loopOrder.begin(), loopOrder.end()));
 
@@ -549,10 +615,6 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
             return this->loopCostHeuristic(loopOrder1) < this->loopCostHeuristic(loopOrder2); 
          });
 
-   if( loopOrders.size() != factorial(dim_) ){
-      printf("Internal error: number of loop-orders incorrect.\n");
-      exit(-1);
-   }
    if( this->infoLevel_ > 1 )
       for(auto loopOrder : loopOrders) {
          printVector(loopOrder,"loop");
@@ -568,14 +630,10 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
 
-   if( sizeA_[0] % blocking_ != 0 || sizeA_[perm_[0]] % blocking_ != 0 ) {
+   if( perm_[0] != 0 && ( sizeA_[0] % blocking_ != 0 || sizeA_[perm_[0]] % blocking_ != 0 ) ) {
       printf("Error/TODO: vectorization of remainder\n");
       exit(-1);
    }
-   if( perm_[0] == 0 ){ 
-      printf("TODO: perm[0] == 0\n"); 
-      exit(-1); 
-   } 
 
    for( auto numThreadsAtLoop : parallelismStrategies )
    {
@@ -599,7 +657,10 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
                int index = loopOrder[i];
 
                if( index == 0 || index == perm_[0] )
-                  currentNode->inc = blocking_;
+                  if( perm_[0] != 0 )
+                     currentNode->inc = blocking_;
+                  else
+                     currentNode->inc = blocking_constStride1_;
                else
                   currentNode->inc = 1;
 
@@ -611,29 +672,29 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
                numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
                const int commId = (threadIdComm/numThreadsPerComm);
                threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
-//               if( numParallelismAvailable  % numSubCommunicators != 0 ){
-//                  printf("ERROR: TODO: parallelism not devisible\n"); // This might already be working!!!
-//                  exit(-1);
-//               }
-               //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
 
                currentNode->start = commId * workPerThread * currentNode->inc;
                currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
 
                currentNode->lda = lda_[index];
                currentNode->ldb = ldb_[findPos(index, perm_)];
-               currentNode->next = new ComputeNode;
 
-               currentNode = currentNode->next;
+               if( perm_[0] != 0 || i != dim_-1 ){
+                  currentNode->next = new ComputeNode;
+                  currentNode = currentNode->next;
+               }
             }
 
             //macro-kernel
-            currentNode->start = -1;
-            currentNode->end = -1;
-            currentNode->inc = -1;
-            currentNode->lda = lda_[ posStride1B_inA ];
-            currentNode->ldb = ldb_[ posStride1A_inB ];
-            currentNode->next = nullptr;
+            if( perm_[0] != 0 )
+            {
+               currentNode->start = -1;
+               currentNode->end = -1;
+               currentNode->inc = -1;
+               currentNode->lda = lda_[ posStride1B_inA ];
+               currentNode->ldb = ldb_[ posStride1A_inB ];
+               currentNode->next = nullptr;
+            }
          }
          plans.push_back(rootNodes);
       }
@@ -696,14 +757,15 @@ ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
    double timeLimit = this->getTimeLimit(); //in seconds
 
    float minTime = FLT_MAX;
-   ComputeNode* bestPlan = plans[0];
+   int bestPlan_id = 0;
 
    if( plans.size() > 1 )
    {
       int plansEvaluated = 0;
       double startTime = omp_get_wtime();
-      for( auto p : plans )
+      for( int plan_id = 0; plan_id < plans.size(); plan_id++ )
       {
+         auto p = plans[plan_id];
          if( omp_get_wtime() - startTime >= timeLimit ) // timelimit reached
             break;
 
@@ -711,14 +773,14 @@ ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
          plansEvaluated++;
 
          if( estimatedTime < minTime ){
-            bestPlan = p;
+            bestPlan_id = plan_id;
             minTime = estimatedTime;
          }
       }
       if( this->infoLevel_ > 0 )
-         printf("We evaluated %d candidates.\n", plansEvaluated); 
+         printf("We evaluated %d/%d candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
    }
-   return bestPlan;
+   return plans[bestPlan_id];
 }
 
 }
