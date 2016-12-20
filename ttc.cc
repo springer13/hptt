@@ -312,11 +312,10 @@ void Transpose::getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const
       if( !done )
          unmatchedPrimeFactors.push_back(p);
    }
-   if( unmatchedPrimeFactors.size() > 0 )
+   if( unmatchedPrimeFactors.size() > 0 ) //TODO
    {
-      printf("unmactched: \n");
-      for( auto p : unmatchedPrimeFactors) 
-         std::cout<< p << " ";
+      printf("todo: unmatched primefactors.\n");
+      printVector(unmatchedPrimeFactors, "unmatched primefactors");
       std::cout<< "\n";
       for( auto loopIdx : loopOrder )
          printf("%d: %d\n",loopIdx , numThreadsAtLoop[loopIdx]); 
@@ -542,6 +541,15 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
 
+   if( size[0] % blocking_ ! = 0 || size[perm[0]] % blocking_ != 0 ) {
+      printf("Error/TODO: vectorization of remainder\n");
+      exit(-1);
+   }
+   if( perm_[0] == 0 ){ 
+      printf("TODO: perm[0] == 0\n"); 
+      exit(-1); 
+   } 
+
    for( auto loopOrder : loopOrders)
    {
       ComputeNode *rootNodes = new ComputeNode[numThreads_];
@@ -554,7 +562,6 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
          int posStride1A_inB = findPos(0, perm_);
          int posStride1B_inA = perm_[0];
 
-         if( perm_[0] == 0 ){ printf("TODO\n"); exit(-1); } // TODO
 
          int numThreadsPerComm = numThreads_; //global communicator
          int threadIdComm = threadId;
