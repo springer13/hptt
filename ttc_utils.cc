@@ -1,10 +1,11 @@
 #include <vector>
+#include <list>
 #include <stdio.h>
 #include <stdlib.h>
 
 namespace ttc {
 
-void getPrimeFactors( int n, std::vector<int> &primeFactors )
+void getPrimeFactors( int n, std::list<int> &primeFactors )
 {
    primeFactors.clear();
    for(int i=2;i <= n ; ++i){

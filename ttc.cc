@@ -3,6 +3,7 @@
 #include <list>
 #include <algorithm>
 #include <iostream>
+#include <cmath>
 
 #include <float.h>
 #include <stdio.h>
@@ -251,76 +252,105 @@ void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) con
    }
 }
 
-void Transpose::preferedLoopOrderForParallelization( std::vector<int> &loopOrder ) const
+void Transpose::getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
+                                             std::vector<int> &availableParallelismAtLoop, 
+                                             std::vector<int> &achievedParallelismAtLoop, 
+                                             std::list<std::vector<int> > &parallelismStrategies) const
 {
-   // prefer non-stride-1 loops for parallelization
-   for(int loopIdx=1; loopIdx < dim_; ++loopIdx){
-      if( loopIdx != perm_[0] && loopIdx != perm_[1] )
-         loopOrder.push_back(loopIdx);
-   }
-   if( sizeA_[perm_[0]] < 150 )
-   {
-      if( !hasItem(loopOrder, 0) )
-         loopOrder.push_back(0);
-      if( !hasItem(loopOrder, perm_[1]) )
-         loopOrder.push_back(perm_[1]);
-   } else {
-      if( !hasItem(loopOrder, perm_[1]) )
-         loopOrder.push_back(perm_[1]);
-      if( !hasItem(loopOrder, 0) )
-         loopOrder.push_back(0);
-   }
-   if( !hasItem(loopOrder, perm_[0]) )
-      loopOrder.push_back(perm_[0]);
+   if( primeFactorsToMatch.size() > 0 ){
+      for( auto p : primeFactorsToMatch )
+      {
+         for( int i = 0; i < dim_; i++ )
+         {
+            std::list<int> primeFactorsToMatch_(primeFactorsToMatch); 
+            std::vector<int> availableParallelismAtLoop_(availableParallelismAtLoop); 
+            std::vector<int> achievedParallelismAtLoop_(achievedParallelismAtLoop);
 
-   assert( loopOrder.size() == dim_ );
-}
+            primeFactorsToMatch_.erase( std::find(primeFactorsToMatch_.begin(), primeFactorsToMatch_.end(), p) );
+            availableParallelismAtLoop_[i] = (availableParallelismAtLoop_[i] + p - 1) / p;
+            achievedParallelismAtLoop_[i] *= p;
 
-void Transpose::getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const
-{
-   numThreadsAtLoop.resize(dim_, 1);
-   for( int i = 0; i < dim_; i++ ) //BUGFIX, this is requriered for whatever reason
-      numThreadsAtLoop[i] = 1;
-   printVector<int>(numThreadsAtLoop, "numThreadsAtLoop");
-   if( numThreads_ == 1 )
-      return;
-
-   std::vector<int> primeFactors;
-   getPrimeFactors( numThreads_, primeFactors );
-   printVector(primeFactors , "primeFactors");
-
-   std::vector<int> numTasksPerLoop;
-   this->getAvailableParallelism( numTasksPerLoop );
-   printVector(numTasksPerLoop, "numTasksPerLoop");
-
-   std::vector<int> loopOrder; 
-   this->preferedLoopOrderForParallelization( loopOrder );
-   printVector(loopOrder, "loopOrder");
-
-   std::vector<int> unmatchedPrimeFactors;
-   for( auto p : primeFactors ) {
-      int done = 0;
-      //find a match for every primefactor
-      for( auto loopIdx : loopOrder ){
-         if( numTasksPerLoop[loopIdx] % p == 0 ){
-            numTasksPerLoop[loopIdx] /= p;
-            numThreadsAtLoop[loopIdx] *= p;
-            done = 1;
-            break;
+            this->getAllParallelismStrategies( primeFactorsToMatch_, 
+                  availableParallelismAtLoop_, 
+                  achievedParallelismAtLoop_, 
+                  parallelismStrategies);
          }
       }
-      if( !done )
-         unmatchedPrimeFactors.push_back(p);
+   } else {
+      // avoid duplicates
+      if( parallelismStrategies.end() == std::find(parallelismStrategies.begin(), parallelismStrategies.end(), achievedParallelismAtLoop) )
+         parallelismStrategies.push_back(achievedParallelismAtLoop);
    }
-   if( unmatchedPrimeFactors.size() > 0 ) //TODO
-   {
-      printf("todo: unmatched primefactors.\n");
-      printVector(unmatchedPrimeFactors, "unmatched primefactors");
-      std::cout<< "\n";
-      for( auto loopIdx : loopOrder )
-         printf("%d: %d\n",loopIdx , numThreadsAtLoop[loopIdx]); 
-      exit(-1);
+}
+
+double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedParallelismAtLoop ) const
+{
+   std::vector<int> availableParallelismAtLoop;
+   this->getAvailableParallelism( availableParallelismAtLoop);
+
+   double cost = 1;
+   // penalize load-imbalance
+   for(int i=0;i < dim_ ; ++i){
+      const int workPerThread = (availableParallelismAtLoop[i] + achievedParallelismAtLoop[i] -1) / achievedParallelismAtLoop[i];
+      cost *= ((double)(workPerThread * achievedParallelismAtLoop[i]) / availableParallelismAtLoop[i]);
    }
+
+   // penalize parallelization of stride-1 loops
+   if( perm_[0] == 0 )
+      cost *= std::pow(1.01, achievedParallelismAtLoop[0] - 1); //strongly penalize this case
+
+   cost *= std::pow(1.00010, std::min(16,achievedParallelismAtLoop[0] - 1));        // if at all, prefer ...
+   cost *= std::pow(1.00015, std::min(16,achievedParallelismAtLoop[perm_[0]] - 1)); // parallelization in stride-1 of A
+
+   const int workPerThread = (availableParallelismAtLoop[perm_[0]] + achievedParallelismAtLoop[perm_[0]] -1) / achievedParallelismAtLoop[perm_[0]];
+   if( workPerThread * sizeof(float) % 32 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
+      cost *= std::pow(1.00015, std::min(16,achievedParallelismAtLoop[perm_[0]] - 1)); // penalize this parallelization again
+   }
+   return cost;
+}
+
+void Transpose::getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const
+{
+   parallelismStrategies.clear();
+   if( numThreads_ == 1 )
+      parallelismStrategies.push_back(std::vector<int>(dim_, 1));
+
+   // ATTENTION: we don't care about the case where numThreads_ is a large prime number!!!
+   // (yes, that inclues KNC)
+   //
+   // we factorize numThreads into its prime factors because we have to match
+   // every one to a certain loop. In principle every loop could be used to
+   // match every primefactor, but some choices are preferable over others.
+   // E.g., we want to achive good load-balancing _and_ try to avoid the
+   // stride-1 index of B (due to false sharing)
+   std::list<int> primeFactors;
+   getPrimeFactors( numThreads_, primeFactors );
+   printVector(primeFactors,"primes");
+
+   std::vector<int> availableParallelismAtLoop;
+   this->getAvailableParallelism( availableParallelismAtLoop);
+   if( this->infoLevel_ > 0 )
+      printVector(availableParallelismAtLoop,"available Parallelism");
+
+   std::vector<int> achievedParallelismAtLoop (dim_, 1);
+
+   this->getAllParallelismStrategies( primeFactors, 
+         availableParallelismAtLoop, 
+         achievedParallelismAtLoop, 
+         parallelismStrategies);
+   
+   // sort according to loop heuristic
+   parallelismStrategies.sort(
+         [this](const std::vector<int> loopOrder1, const std::vector<int> loopOrder2)
+         { 
+            return this->parallelismCostHeuristic(loopOrder1) < this->parallelismCostHeuristic(loopOrder2); 
+         });
+
+   if( this->infoLevel_ > 1 )
+      for( auto strat : parallelismStrategies ){
+         printVector(strat,"parallelization");
+         printf("cost: %f\n", this->parallelismCostHeuristic( strat ));
+      }
 }
 
 void Transpose::verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const
@@ -523,25 +553,22 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
       printf("Internal error: number of loop-orders incorrect.\n");
       exit(-1);
    }
-#ifdef DEBUG
-   for(auto loopOrder : loopOrders)
-   {
-      printVector(loopOrder,"loop");
-      printf("penalty: %f\n",loopCostHeuristic(loopOrder));
-   }
-#endif
+   if( this->infoLevel_ > 1 )
+      for(auto loopOrder : loopOrders) {
+         printVector(loopOrder,"loop");
+         printf("penalty: %f\n",loopCostHeuristic(loopOrder));
+      }
 }
 
 void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
 {
-   std::vector<int> numThreadsAtLoop(dim_);
-   this->getParallelismStrategy( numThreadsAtLoop );
-   printVector(numThreadsAtLoop , "numThreadsAtLoop");
+   std::list<std::vector<int> > parallelismStrategies;
+   this->getParallelismStrategies(parallelismStrategies);
 
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
 
-   if( size[0] % blocking_ ! = 0 || size[perm[0]] % blocking_ != 0 ) {
+   if( sizeA_[0] % blocking_ != 0 || sizeA_[perm_[0]] % blocking_ != 0 ) {
       printf("Error/TODO: vectorization of remainder\n");
       exit(-1);
    }
@@ -550,63 +577,66 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
       exit(-1); 
    } 
 
-   for( auto loopOrder : loopOrders)
+   for( auto numThreadsAtLoop : parallelismStrategies )
    {
-      ComputeNode *rootNodes = new ComputeNode[numThreads_];
+      for( auto loopOrder : loopOrders)
+      {
+         ComputeNode *rootNodes = new ComputeNode[numThreads_];
 
 #pragma omp parallel num_threads(numThreads_)
-      {
-         int threadId = omp_get_thread_num();
-         ComputeNode *currentNode = &rootNodes[threadId];
+         {
+            int threadId = omp_get_thread_num();
+            ComputeNode *currentNode = &rootNodes[threadId];
 
-         int posStride1A_inB = findPos(0, perm_);
-         int posStride1B_inA = perm_[0];
+            int posStride1A_inB = findPos(0, perm_);
+            int posStride1B_inA = perm_[0];
 
 
-         int numThreadsPerComm = numThreads_; //global communicator
-         int threadIdComm = threadId;
-         // create loops
-         for(int i=0; i < dim_; ++i){
-            int index = loopOrder[i];
+            int numThreadsPerComm = numThreads_; //global communicator
+            int threadIdComm = threadId;
+            // create loops
+            for(int i=0; i < dim_; ++i){
+               int index = loopOrder[i];
 
-            if( index == 0 || index == perm_[0] )
-               currentNode->inc = blocking_;
-            else
-               currentNode->inc = 1;
+               if( index == 0 || index == perm_[0] )
+                  currentNode->inc = blocking_;
+               else
+                  currentNode->inc = 1;
 
-            const int numSubCommunicators = numThreadsAtLoop[index];
+               const int numSubCommunicators = numThreadsAtLoop[index];
 
-            const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
-            const int workPerThread = numParallelismAvailable / numSubCommunicators;
+               const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
+               const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
 
-            numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
-            const int commId = (threadIdComm/numThreadsPerComm);
-            threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
-            if( numParallelismAvailable  % numSubCommunicators != 0 ){
-               printf("ERROR: TODO: parallelism not devisible\n");
-               exit(-1);
+               numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
+               const int commId = (threadIdComm/numThreadsPerComm);
+               threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
+//               if( numParallelismAvailable  % numSubCommunicators != 0 ){
+//                  printf("ERROR: TODO: parallelism not devisible\n"); // This might already be working!!!
+//                  exit(-1);
+//               }
+               //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
+
+               currentNode->start = commId * workPerThread * currentNode->inc;
+               currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
+
+               currentNode->lda = lda_[index];
+               currentNode->ldb = ldb_[findPos(index, perm_)];
+               currentNode->next = new ComputeNode;
+
+               currentNode = currentNode->next;
             }
-            //printf("%d: loop %d uses %d, CommId: %d, localThreadId: %d\n",threadId, index, numSubCommunicators, commId, threadIdComm );
 
-            currentNode->start = commId * workPerThread * currentNode->inc;
-            currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
-
-            currentNode->lda = lda_[index];
-            currentNode->ldb = ldb_[findPos(index, perm_)];
-            currentNode->next = new ComputeNode;
-
-            currentNode = currentNode->next;
+            //macro-kernel
+            currentNode->start = -1;
+            currentNode->end = -1;
+            currentNode->inc = -1;
+            currentNode->lda = lda_[ posStride1B_inA ];
+            currentNode->ldb = ldb_[ posStride1A_inB ];
+            currentNode->next = nullptr;
          }
-
-         //macro-kernel
-         currentNode->start = -1;
-         currentNode->end = -1;
-         currentNode->inc = -1;
-         currentNode->lda = lda_[ posStride1B_inA ];
-         currentNode->ldb = ldb_[ posStride1A_inB ];
-         currentNode->next = nullptr;
+         plans.push_back(rootNodes);
       }
-      plans.push_back(rootNodes);
    }
 }
 
@@ -670,6 +700,7 @@ ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
 
    if( plans.size() > 1 )
    {
+      int plansEvaluated = 0;
       double startTime = omp_get_wtime();
       for( auto p : plans )
       {
@@ -677,12 +708,15 @@ ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
             break;
 
          float estimatedTime = this->estimateExecutionTime( p );
+         plansEvaluated++;
 
          if( estimatedTime < minTime ){
             bestPlan = p;
             minTime = estimatedTime;
          }
       }
+      if( this->infoLevel_ > 0 )
+         printf("We evaluated %d candidates.\n", plansEvaluated); 
    }
    return bestPlan;
 }

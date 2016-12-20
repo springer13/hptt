@@ -124,7 +124,6 @@ int main(int argc, char *argv[])
      trash2[i] = ((i+1)*13)%100000;
   }
 
-
   // Execute transpose
   {  //ttc-c-paul
      int perm_[dim];

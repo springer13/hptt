@@ -1,28 +1,28 @@
 echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 7248 7248 "
-KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 7248 7248 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 43408 1216 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 43408 1216 
- 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 1216 43408 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 1216 43408 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 384 384 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 384 384 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 2144 64 384 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 2144 64 384 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 64 2307 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 64 2307 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 384 355 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 384 355 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 2320 384 59 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 2320 384 59 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 2320 59 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 2320 59 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 355 384 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 355 384 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 2320 59 384 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 2320 59 384 
- echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 59 2320 "
- KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 59 2320 
+KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 7264 7264
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 43408 1216 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 2 1 0 43408 1216 
+# 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 1216 43408 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 1216 43408 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 384 384 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 384 384 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 2144 64 384 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 2144 64 384 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 64 2307 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 0 2 1 368 64 2307 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 384 355 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 384 355 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 2320 384 59 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 2320 384 59 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 2320 59 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 1 0 2 384 2320 59 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 355 384 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 355 384 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 2320 59 384 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 2320 59 384 
+# echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 59 2320 "
+# KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 3 2 1 0 384 59 2320 
 # 
 # echo "KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 4 0 3 2 1 80 96 75 96 "
 # KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./transpose.exe 4 0 3 2 1 80 96 75 96 

@@ -1,6 +1,9 @@
 #ifndef TTC_C_H
 #define TTC_C_H
 
+#include <list>
+#include <vector>
+
 #include <stdio.h>
 
 namespace ttc {
@@ -55,6 +58,7 @@ class Transpose{
          blocking_(32),
          trash1_(nullptr),
          trash2_(nullptr),
+         infoLevel_(1),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);
@@ -102,6 +106,8 @@ class Transpose{
       float getBeta() const noexcept { return beta_; }
       void setAlpha(float alpha) noexcept { alpha_ = alpha; }
       void setBeta(float beta) noexcept { beta_ = beta; }
+      void setInfoLevel(int infoLevel) noexcept { infoLevel_ = infoLevel; }
+      int getInfoLevel() noexcept { return infoLevel_; }
 
       /***************************************************
        * Public Methods
@@ -120,6 +126,7 @@ class Transpose{
       void computeLeadingDimensions();
       void trashCaches();
       double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
+      double parallelismCostHeuristic( const std::vector<int> &loopOrder ) const;
 
       /***************************************************
        * Helper Methods
@@ -127,8 +134,11 @@ class Transpose{
       float estimateExecutionTime( const ComputeNode *rootNodes ); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
-      void getParallelismStrategy(std::vector<int> &numThreadsAtLoop) const;
-      void preferedLoopOrderForParallelization( std::vector<int> &loopOrder ) const;
+      void getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const;
+      void getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
+            std::vector<int> &availableParallelismAtLoop, 
+            std::vector<int> &achievedParallelismAtLoop, 
+            std::list<std::vector<int> > &parallelismStrategies) const;
       void getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const;
       void executeEstimate(const ComputeNode *rootNodes) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
       double getTimeLimit() const;
@@ -152,6 +162,8 @@ class Transpose{
 
       float *trash1_, *trash2_;
       int trashSize_;
+
+      int infoLevel_; // determines which auxiliary messages should be printed
 };
 
 

@@ -1,6 +1,8 @@
 #ifndef TTC_UTILS_H
 #define TTC_UTILS_H
 
+#include <list>
+
 namespace ttc {
 
 template<typename t>
@@ -11,15 +13,22 @@ int hasItem(const std::vector<t> &vec, t value)
 
 template<typename t>
 void printVector(const std::vector<t> &vec, const char* label){
-#ifdef DEBUG
    std::cout << label <<": ";
    for( auto a : vec )
       std::cout << a << ", ";
    std::cout << "\n";
-#endif
 }
 
-void getPrimeFactors( int n, std::vector<int> &primeFactors );
+template<typename t>
+void printVector(const std::list<t> &vec, const char* label){
+   std::cout << label <<": ";
+   for( auto a : vec )
+      std::cout << a << ", ";
+   std::cout << "\n";
+}
+
+
+void getPrimeFactors( int n, std::list<int> &primeFactors );
 
 template<typename t>
 int findPos(t value, const std::vector<t> &array)
