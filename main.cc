@@ -9,6 +9,7 @@
 #include <iostream>
 #include <omp.h>
 #include <stdlib.h>
+#include <math.h>
 
 
 #include <ttc_c.h>
@@ -20,6 +21,10 @@ void equal_(const float *A, const float*B, int total_size){
    const float *Atmp= A;
    const float *Btmp= B;
    for(int i=0;i < total_size ; ++i){
+      if( Atmp[i] != Atmp[i] || Btmp[i] != Btmp[i]  || isinf(Atmp[i]) || isinf(Btmp[i]) ){
+         error += 1; //test for NaN or Inf
+         continue;
+      }
       double Aabs = (Atmp[i] < 0) ? -Atmp[i] : Atmp[i];
       double Babs = (Btmp[i] < 0) ? -Btmp[i] : Btmp[i];
       double max = (Aabs < Babs) ? Babs : Aabs;
@@ -79,7 +84,7 @@ int main(int argc, char *argv[])
   }
   printf("\n");
 
-  int nRepeat = 5;
+  int nRepeat = 2;
 
   // Create handle
   ttc_handler_s *ttc_handle = ttc_init();
@@ -99,12 +104,16 @@ int main(int argc, char *argv[])
   int largerThanL3 = 1024*1024*100/sizeof(double);
   float *A, *B, *B_copy, *B_ttc;
   double *trash1, *trash2;
-  posix_memalign((void**) &trash1, 32, sizeof(double) * largerThanL3);
-  posix_memalign((void**) &trash2, 32, sizeof(double) * largerThanL3);
-  posix_memalign((void**) &B, 32, sizeof(float) * total_size);
-  posix_memalign((void**) &A, 32, sizeof(float) * total_size);
-  posix_memalign((void**) &B_copy, 32, sizeof(float) * total_size);
-  posix_memalign((void**) &B_ttc, 32, sizeof(float) * total_size);
+  int ret = posix_memalign((void**) &trash1, 32, sizeof(double) * largerThanL3);
+  ret += posix_memalign((void**) &trash2, 32, sizeof(double) * largerThanL3);
+  ret += posix_memalign((void**) &B, 32, sizeof(float) * total_size);
+  ret += posix_memalign((void**) &A, 32, sizeof(float) * total_size);
+  ret += posix_memalign((void**) &B_copy, 32, sizeof(float) * total_size);
+  ret += posix_memalign((void**) &B_ttc, 32, sizeof(float) * total_size);
+  if( ret ){
+     printf("ALLOC ERROR\n");
+     exit(-1);
+  }
 
   // initialize data
 #pragma omp parallel for
@@ -123,35 +132,36 @@ int main(int argc, char *argv[])
      trash1[i] = ((i+1)*13)%100000;
      trash2[i] = ((i+1)*13)%100000;
   }
-
+  
   // Execute transpose
   {  //ttc-c-paul
      int perm_[dim];
      int size_[dim];
      for(int i=0;i < dim ; ++i){
-        perm_[i] = perm[i];
-        size_[i] = size[i];
+        perm_[i] = (int)perm[i];
+        size_[i] = (int)size[i];
      }
+     printf("dim: %d\n", dim);
 
      ttc::Transpose transpose( size_, perm_, NULL, NULL, dim, A, alpha, B_ttc, beta, ttc::MEASURE, numThreads );
      transpose.createPlan();
 
+     restore(B, B_copy, total_size);
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
         ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         transpose.execute();
-        double elapsed_time = omp_get_wtime() - begin_time;
+        auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
      printf("TTC (paul): %.2f ms. %.2f GiB/s\n", minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
   }
-
- 
   { // original ttc
+     restore(B_ttc, B_copy, total_size);
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
-        ttc::trashCache(trash1, trash2, largerThanL3);
+        //ttc::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
         ttc_transpose(ttc_handle, &param, A, B);
