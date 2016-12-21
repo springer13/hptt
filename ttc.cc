@@ -9,6 +9,7 @@
 #include <float.h>
 #include <stdio.h>
 #include <assert.h>
+#include <immintrin.h>
 
 #include <omp.h>
 
@@ -24,7 +25,8 @@
 namespace ttc {
 
 //B_ji = alpha * A_ij + beta * B_ji
-static INLINE void sTranspose8x8(const float* __restrict__ A, const int lda, float* __restrict__ B, const int ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
+template<int betaIsZero>
+static INLINE void sTranspose8x8(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
 {
    //Load A
    __m256 rowA0 = _mm256_load_ps((A + 0 +0*lda));
@@ -74,141 +76,161 @@ static INLINE void sTranspose8x8(const float* __restrict__ A, const int lda, flo
    rowA7 = _mm256_mul_ps(rowA7, reg_alpha);
 
    //Load B
-   __m256 rowB0 = _mm256_load_ps((B + 0 +0*ldb));
-   __m256 rowB1 = _mm256_load_ps((B + 0 +1*ldb));
-   __m256 rowB2 = _mm256_load_ps((B + 0 +2*ldb));
-   __m256 rowB3 = _mm256_load_ps((B + 0 +3*ldb));
-   __m256 rowB4 = _mm256_load_ps((B + 0 +4*ldb));
-   __m256 rowB5 = _mm256_load_ps((B + 0 +5*ldb));
-   __m256 rowB6 = _mm256_load_ps((B + 0 +6*ldb));
-   __m256 rowB7 = _mm256_load_ps((B + 0 +7*ldb));
+   if( !betaIsZero )
+   {
+      __m256 rowB0 = _mm256_load_ps((B + 0 +0*ldb));
+      __m256 rowB1 = _mm256_load_ps((B + 0 +1*ldb));
+      __m256 rowB2 = _mm256_load_ps((B + 0 +2*ldb));
+      __m256 rowB3 = _mm256_load_ps((B + 0 +3*ldb));
+      __m256 rowB4 = _mm256_load_ps((B + 0 +4*ldb));
+      __m256 rowB5 = _mm256_load_ps((B + 0 +5*ldb));
+      __m256 rowB6 = _mm256_load_ps((B + 0 +6*ldb));
+      __m256 rowB7 = _mm256_load_ps((B + 0 +7*ldb));
 
-   rowB0 = _mm256_add_ps( _mm256_mul_ps(rowB0, reg_beta), rowA0);
-   rowB1 = _mm256_add_ps( _mm256_mul_ps(rowB1, reg_beta), rowA1);
-   rowB2 = _mm256_add_ps( _mm256_mul_ps(rowB2, reg_beta), rowA2);
-   rowB3 = _mm256_add_ps( _mm256_mul_ps(rowB3, reg_beta), rowA3);
-   rowB4 = _mm256_add_ps( _mm256_mul_ps(rowB4, reg_beta), rowA4);
-   rowB5 = _mm256_add_ps( _mm256_mul_ps(rowB5, reg_beta), rowA5);
-   rowB6 = _mm256_add_ps( _mm256_mul_ps(rowB6, reg_beta), rowA6);
-   rowB7 = _mm256_add_ps( _mm256_mul_ps(rowB7, reg_beta), rowA7);
-   //Store B
-   _mm256_store_ps((B + 0 + 0 * ldb), rowB0);
-   _mm256_store_ps((B + 0 + 1 * ldb), rowB1);
-   _mm256_store_ps((B + 0 + 2 * ldb), rowB2);
-   _mm256_store_ps((B + 0 + 3 * ldb), rowB3);
-   _mm256_store_ps((B + 0 + 4 * ldb), rowB4);
-   _mm256_store_ps((B + 0 + 5 * ldb), rowB5);
-   _mm256_store_ps((B + 0 + 6 * ldb), rowB6);
-   _mm256_store_ps((B + 0 + 7 * ldb), rowB7);
+      rowB0 = _mm256_add_ps( _mm256_mul_ps(rowB0, reg_beta), rowA0);
+      rowB1 = _mm256_add_ps( _mm256_mul_ps(rowB1, reg_beta), rowA1);
+      rowB2 = _mm256_add_ps( _mm256_mul_ps(rowB2, reg_beta), rowA2);
+      rowB3 = _mm256_add_ps( _mm256_mul_ps(rowB3, reg_beta), rowA3);
+      rowB4 = _mm256_add_ps( _mm256_mul_ps(rowB4, reg_beta), rowA4);
+      rowB5 = _mm256_add_ps( _mm256_mul_ps(rowB5, reg_beta), rowA5);
+      rowB6 = _mm256_add_ps( _mm256_mul_ps(rowB6, reg_beta), rowA6);
+      rowB7 = _mm256_add_ps( _mm256_mul_ps(rowB7, reg_beta), rowA7);
+      //Store B
+      _mm256_store_ps((B + 0 + 0 * ldb), rowB0);
+      _mm256_store_ps((B + 0 + 1 * ldb), rowB1);
+      _mm256_store_ps((B + 0 + 2 * ldb), rowB2);
+      _mm256_store_ps((B + 0 + 3 * ldb), rowB3);
+      _mm256_store_ps((B + 0 + 4 * ldb), rowB4);
+      _mm256_store_ps((B + 0 + 5 * ldb), rowB5);
+      _mm256_store_ps((B + 0 + 6 * ldb), rowB6);
+      _mm256_store_ps((B + 0 + 7 * ldb), rowB7);
+   } else {
+      _mm256_store_ps((B + 0 + 0 * ldb), rowA0);
+      _mm256_store_ps((B + 0 + 1 * ldb), rowA1);
+      _mm256_store_ps((B + 0 + 2 * ldb), rowA2);
+      _mm256_store_ps((B + 0 + 3 * ldb), rowA3);
+      _mm256_store_ps((B + 0 + 4 * ldb), rowA4);
+      _mm256_store_ps((B + 0 + 5 * ldb), rowA5);
+      _mm256_store_ps((B + 0 + 6 * ldb), rowA6);
+      _mm256_store_ps((B + 0 + 7 * ldb), rowA7);
+   }
 }
 
-template<int blockingA, int blockingB>
-static INLINE void sTranspose(const float* __restrict__ A, const int lda, float* __restrict__ B, const int ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
+template<int blockingA, int blockingB, int betaIsZero>
+static INLINE void sTranspose(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
 {
    //invoke micro-transpose
    if(blockingA > 0 && blockingB > 0 )
-   sTranspose8x8(A, lda, B, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A, lda, B, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 0 && blockingB > 8 )
-   sTranspose8x8(A + 8 * lda, lda, B + 8, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 8 * lda, lda, B + 8, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 0 && blockingB > 16 )
-   sTranspose8x8(A + 16 * lda, lda, B + 16, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 16 * lda, lda, B + 16, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 0 && blockingB > 24 )
-   sTranspose8x8(A + 24 * lda, lda, B + 24, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 24 * lda, lda, B + 24, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 8 && blockingB > 0 )
-   sTranspose8x8(A + 8, lda, B + 8 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 8, lda, B + 8 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 8 && blockingB > 8 )
-   sTranspose8x8(A + 8 + 8 * lda, lda, B + 8 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 8 + 8 * lda, lda, B + 8 + 8 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 8 && blockingB > 16 )
-   sTranspose8x8(A + 8 + 16 * lda, lda, B + 16 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 8 + 16 * lda, lda, B + 16 + 8 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 8 && blockingB > 24 )
-   sTranspose8x8(A + 8 + 24 * lda, lda, B + 24 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 8 + 24 * lda, lda, B + 24 + 8 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 16 && blockingB > 0 )
-   sTranspose8x8(A + 16, lda, B + 16 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 16, lda, B + 16 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 16 && blockingB > 8 )
-   sTranspose8x8(A + 16 + 8 * lda, lda, B + 8 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 16 + 8 * lda, lda, B + 8 + 16 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 16 && blockingB > 16 )
-   sTranspose8x8(A + 16 + 16 * lda, lda, B + 16 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 16 + 16 * lda, lda, B + 16 + 16 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 16 && blockingB > 24 )
-   sTranspose8x8(A + 16 + 24 * lda, lda, B + 24 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 16 + 24 * lda, lda, B + 24 + 16 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 24 && blockingB > 0 )
-   sTranspose8x8(A + 24, lda, B + 24 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 24, lda, B + 24 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 24 && blockingB > 8 )
-   sTranspose8x8(A + 24 + 8 * lda, lda, B + 8 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 24 + 8 * lda, lda, B + 8 + 24 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 24 && blockingB > 16 )
-   sTranspose8x8(A + 24 + 16 * lda, lda, B + 16 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 24 + 16 * lda, lda, B + 16 + 24 * ldb, ldb  , reg_alpha , reg_beta);
 
    //invoke micro-transpose
    if(blockingA > 24 && blockingB > 24 )
-   sTranspose8x8(A + 24 + 24 * lda, lda, B + 24 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+   sTranspose8x8<betaIsZero>(A + 24 + 24 * lda, lda, B + 24 + 24 * ldb, ldb  , reg_alpha , reg_beta);
 }
 
+template<int betaIsZero>
 void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const __m256 alpha, const __m256 beta, const ComputeNode* plan)
 {
-   const int end = plan->end - (plan->inc - 1);
-   const int inc = plan->inc;
-   const int lda_ = plan->lda;
-   const int ldb_ = plan->ldb;
+   const size_t end = plan->end - (plan->inc - 1);
+   const size_t inc = plan->inc;
+   const size_t lda_ = plan->lda;
+   const size_t ldb_ = plan->ldb;
 
    if( plan->next != nullptr )
-      for(int i = plan->start; i < end; i+= inc)
+      for(size_t i = plan->start; i < end; i+= inc)
          // recurse
-         sTranspose_int( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         sTranspose_int<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
    else 
       // invoke macro-kernel
-      sTranspose<32,32>(A, lda_, B, ldb_, alpha, beta);
+      sTranspose<32,32, betaIsZero>(A, lda_, B, ldb_, alpha, beta);
 }
 
+template<int betaIsZero>
 void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, const ComputeNode* plan)
 {
-   const int end = plan->end - (plan->inc - 1);
-   const int inc = plan->inc;
-   const int lda_ = plan->lda;
-   const int ldb_ = plan->ldb;
+   const size_t end = plan->end - (plan->inc - 1);
+   const size_t inc = plan->inc;
+   const size_t lda_ = plan->lda;
+   const size_t ldb_ = plan->ldb;
 
    if( plan->next != nullptr )
       for(int i = plan->start; i < end; i+= inc)
          // recurse
-         sTranspose_int_constStride1( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         sTranspose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
    else 
-      for(int i = plan->start; i < end; i+= inc)
-         B[i] = alpha * A[i] + beta * B[i];
+      if( !betaIsZero )
+      {
+         for(size_t i = plan->start; i < end; i+= inc)
+            B[i] = alpha * A[i] + beta * B[i];
+      } else {
+         for(size_t i = plan->start; i < end; i+= inc)
+            B[i] = alpha * A[i];
+      }
 }
 
 // prints a plan
 void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __restrict__ B, const ComputeNode* plan, int level)
 {
-   const int end = plan->end - (plan->inc - 1);
-   const int inc = plan->inc;
-   const int lda_ = plan->lda;
-   const int ldb_ = plan->ldb;
+   const size_t end = plan->end - (plan->inc - 1);
+   const size_t inc = plan->inc;
+   const size_t lda_ = plan->lda;
+   const size_t ldb_ = plan->ldb;
 
    if( plan->next != nullptr ){
       printf("for(int i%d = %d; i%d < %d; i%d+= %d){ //lda: %d ldb: %d \n", level, plan->start, level, end, level, inc, lda_, ldb_);
@@ -260,11 +282,21 @@ void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
 
+      if( std::fabs(beta_) < 1e-8 ) {
 #pragma omp parallel num_threads(numThreads_)
-      sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+         sTranspose_int<1>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+      } else {
+#pragma omp parallel num_threads(numThreads_)
+         sTranspose_int<0>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+      }
    } else {
+      if( std::fabs(beta_) < 1e-8 ) {
 #pragma omp parallel num_threads(numThreads_)
-      sTranspose_int_constStride1( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+      }else{
+#pragma omp parallel num_threads(numThreads_)
+         sTranspose_int_constStride1<1>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+      }
    }
 }
 
@@ -282,11 +314,21 @@ void Transpose::execute() noexcept
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(beta_);
 
+      if( std::fabs(beta_) < 1e-8 ) {
 #pragma omp parallel num_threads(numThreads_)
-      sTranspose_int( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+         sTranspose_int<1>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+      } else {
+#pragma omp parallel num_threads(numThreads_)
+         sTranspose_int<0>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+      }
    } else {
+      if( std::fabs(beta_) < 1e-8 ) {
 #pragma omp parallel num_threads(numThreads_)
-      sTranspose_int_constStride1( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+         sTranspose_int_constStride1<1>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+      } else {
+#pragma omp parallel num_threads(numThreads_)
+         sTranspose_int_constStride1<0>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+      }
 //      sTranspose_int_constStride1_print( A_, B_, &rootNodes_[omp_get_thread_num()], 0);
 //      exit(-1);
    }

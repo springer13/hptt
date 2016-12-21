@@ -20,11 +20,11 @@ class ComputeNode{
             delete next;
       }
 
-   int start;
-   int end;
-   int inc;
-   int lda;
-   int ldb;
+   size_t start;
+   size_t end;
+   size_t inc;
+   size_t lda;
+   size_t ldb;
    ComputeNode *next;
 };
 
@@ -38,9 +38,9 @@ class Transpose{
        * Cons, Decons, Copy, ...
        ***************************************************/
       Transpose( const int *sizeA, 
-                 const int* perm, 
-                 const int* outerSizeA, 
-                 const int* outerSizeB, 
+                 const int *perm, 
+                 const int *outerSizeA, 
+                 const int *outerSizeB, 
                  const int dim,
                  const float *A,
                  const float alpha,
@@ -149,12 +149,12 @@ class Transpose{
       float alpha_;
       float beta_;
       int dim_;
-      std::vector<int> sizeA_;
+      std::vector<size_t> sizeA_;
       std::vector<int> perm_; 
-      std::vector<int> outerSizeA_; 
-      std::vector<int> outerSizeB_; 
-      std::vector<int> lda_; 
-      std::vector<int> ldb_; 
+      std::vector<size_t> outerSizeA_; 
+      std::vector<size_t> outerSizeB_; 
+      std::vector<size_t> lda_; 
+      std::vector<size_t> ldb_; 
       int numThreads_;
 
       ComputeNode *rootNodes_; //one for each thread
