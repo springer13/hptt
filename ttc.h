@@ -92,7 +92,7 @@ class Transpose{
          blocking_constStride1_(1), //TODO
          trash1_(nullptr),
          trash2_(nullptr),
-         infoLevel_(2),
+         infoLevel_(1),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);
@@ -168,12 +168,13 @@ class Transpose{
       float estimateExecutionTime( const Plan *plan); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
-      void getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const;
+      void getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const;
       void getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
             std::vector<int> &availableParallelismAtLoop, 
             std::vector<int> &achievedParallelismAtLoop, 
-            std::list<std::vector<int> > &parallelismStrategies) const;
+            std::vector<std::vector<int> > &parallelismStrategies) const;
       void getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const;
+      int getIncrement( int loopIdx ) const;
       void executeEstimate(const Plan *plan) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
       double getTimeLimit() const;
 

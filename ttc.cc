@@ -333,19 +333,24 @@ void Transpose::execute() noexcept
    }
 }
 
+int Transpose::getIncrement( int loopIdx ) const
+{
+   int inc = 1;
+   if( perm_[0] != 0 ) {
+      if( loopIdx == 0 || loopIdx == perm_[0] )
+         inc = blocking_;
+   } else {
+      if( loopIdx == 1 || loopIdx == perm_[1] )
+         inc = blocking_constStride1_;
+   }
+   return inc;
+}
+
 void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const
 {
    numTasksPerLoop.resize(dim_);
    for(int loopIdx=0; loopIdx < dim_; ++loopIdx){
-      int inc = 1;
-      if( perm_[0] != 0 )
-      {
-         if( loopIdx == 0 || loopIdx == perm_[0] )
-            inc = blocking_;
-      } else {
-         if( loopIdx == 1 || loopIdx == perm_[1] )
-            inc = blocking_constStride1_;
-      }
+      int inc = this->getIncrement(loopIdx);
       numTasksPerLoop[loopIdx] = (sizeA_[loopIdx] + inc - 1) / inc;
    }
 }
@@ -353,7 +358,7 @@ void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) con
 void Transpose::getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
                                              std::vector<int> &availableParallelismAtLoop, 
                                              std::vector<int> &achievedParallelismAtLoop, 
-                                             std::list<std::vector<int> > &parallelismStrategies) const
+                                             std::vector<std::vector<int> > &parallelismStrategies) const
 {
    if( primeFactorsToMatch.size() > 0 ){
       for( auto p : primeFactorsToMatch )
@@ -388,10 +393,15 @@ double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedPara
 
    double cost = 1;
    // penalize load-imbalance
-   for(int i=0;i < dim_ ; ++i){
-      const int workPerThread = (availableParallelismAtLoop[i] + achievedParallelismAtLoop[i] -1) / achievedParallelismAtLoop[i];
-      cost *= ((double)(workPerThread * achievedParallelismAtLoop[i]) / availableParallelismAtLoop[i]);
-   }
+   for(int loopIdx=0; loopIdx < dim_ ; ++loopIdx){
+      if ( achievedParallelismAtLoop[loopIdx] <= 1 ) 
+         continue;
+
+      const int blocksPerThread = (availableParallelismAtLoop[loopIdx] + achievedParallelismAtLoop[loopIdx] -1) / achievedParallelismAtLoop[loopIdx];
+      int inc = this->getIncrement( loopIdx );
+      const int effectiveSize = blocksPerThread * inc * achievedParallelismAtLoop[loopIdx];
+      cost *= ((double)(effectiveSize ) / sizeA_[loopIdx]);
+   } 
 
    // penalize parallelization of stride-1 loops
    if( perm_[0] == 0 )
@@ -399,6 +409,7 @@ double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedPara
 
    cost *= std::pow(1.00010, std::min(16,achievedParallelismAtLoop[0] - 1));        // if at all, prefer ...
    cost *= std::pow(1.00015, std::min(16,achievedParallelismAtLoop[perm_[0]] - 1)); // parallelization in stride-1 of A
+   
 
    const int workPerThread = (availableParallelismAtLoop[perm_[0]] + achievedParallelismAtLoop[perm_[0]] -1) / achievedParallelismAtLoop[perm_[0]];
    if( workPerThread * sizeof(float) % 32 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
@@ -407,7 +418,7 @@ double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedPara
    return cost;
 }
 
-void Transpose::getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const
+void Transpose::getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const
 {
    parallelismStrategies.clear();
    if( numThreads_ == 1 ){
@@ -441,7 +452,7 @@ void Transpose::getParallelismStrategies(std::list<std::vector<int> > &paralleli
          parallelismStrategies);
    
    // sort according to loop heuristic
-   parallelismStrategies.sort(
+   std::sort(parallelismStrategies.begin(), parallelismStrategies.end(), 
          [this](const std::vector<int> loopOrder1, const std::vector<int> loopOrder2)
          { 
             return this->parallelismCostHeuristic(loopOrder1) < this->parallelismCostHeuristic(loopOrder2); 
@@ -636,6 +647,9 @@ double Transpose::loopCostHeuristic( const std::vector<int> &loopOrder ) const
 
 void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
+//   std::vector<int> loopOrder1 { 5, 3, 4, 1, 0, 2 };
+//   loopOrders.push_back(loopOrder1 );
+//   return;
    loopOrders.clear();
    std::vector<int> loopOrder;
    for(int i = 0; i < dim_; i++)
@@ -690,7 +704,7 @@ void Transpose::createPlan()
 
 void Transpose::createPlans( std::vector<Plan*> &plans ) const
 {
-   std::list<std::vector<int> > parallelismStrategies;
+   std::vector<std::vector<int> > parallelismStrategies;
    this->getParallelismStrategies(parallelismStrategies);
 
    std::vector<std::vector<int> > loopOrders;
@@ -701,10 +715,18 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
       exit(-1);
    }
 
-   for( auto numThreadsAtLoop : parallelismStrategies )
+   // combine the loopOrder and parallelismStragegies according to their
+   // heuristics, search the space with a growing rectanle (from best to worst,
+   // see line marked with ***)
+   for( int start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ); start++ )
+   for( int i = 0; i < parallelismStrategies.size(); i++)
    {
-      for( auto loopOrder : loopOrders)
+      for( int j = 0; j < loopOrders.size(); j++)
       {
+         if( i > start || j > start || (i != start && j != start) ) continue; //these are already done ***
+
+         auto numThreadsAtLoop = parallelismStrategies[i];
+         auto loopOrder = loopOrders[j];
          Plan *plan = new Plan(numThreads_, loopOrder, numThreadsAtLoop );
 
 #pragma omp parallel num_threads(numThreads_)
@@ -721,17 +743,9 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
             // create loops
             for(int i=0; i < dim_; ++i){
                int index = loopOrder[i];
-
-               if( index == 0 || index == perm_[0] )
-                  if( perm_[0] != 0 )
-                     currentNode->inc = blocking_;
-                  else
-                     currentNode->inc = blocking_constStride1_;
-               else
-                  currentNode->inc = 1;
+               currentNode->inc = this->getIncrement( index );
 
                const int numSubCommunicators = numThreadsAtLoop[index];
-
                const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
                const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
 
@@ -764,6 +778,11 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
          }
          plans.push_back(plan);
       }
+   }
+   if( plans.size() != parallelismStrategies.size() * loopOrders.size() )
+   {
+      printf("Internal error: number of plans does not fit\n");
+      exit(-1);
    }
 }
 
@@ -844,7 +863,7 @@ Plan* Transpose::selectPlan( const std::vector<Plan*> &plans)
          }
          if( this->infoLevel_ > 1 ){
             printf("Plan %d will take roughly %f ms.\n", plan_id, estimatedTime * 1000.);
-            plans[bestPlan_id]->print();
+            plans[plan_id]->print();
          }
       }
       if( this->infoLevel_ > 0 )
