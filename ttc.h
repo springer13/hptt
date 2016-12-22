@@ -8,6 +8,12 @@
 
 namespace ttc {
 
+#ifdef DEBUG
+#define TTC_ERROR_INFO(str) fprintf(stdout, "[INFO] %s:%d : %s\n", __FILE__, __LINE__, str); exit(-1);
+#else
+#define TTC_ERROR_INFO(str)
+#endif
+
 extern float *trash1, *trash2;
 extern int trashSize;
 
@@ -59,7 +65,7 @@ class Transpose{
          blocking_constStride1_(1), //TODO
          trash1_(nullptr),
          trash2_(nullptr),
-         infoLevel_(1),
+         infoLevel_(0),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);

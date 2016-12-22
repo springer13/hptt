@@ -184,7 +184,7 @@ static INLINE void sTranspose(const float* __restrict__ A, const size_t lda, flo
    sTranspose8x8<betaIsZero>(A + 24 + 24 * lda, lda, B + 24 + 24 * ldb, ldb  , reg_alpha , reg_beta);
 }
 
-template<int betaIsZero>
+template<int blockingA, int blockingB, int betaIsZero>
 void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const __m256 alpha, const __m256 beta, const ComputeNode* plan)
 {
    const size_t end = plan->end - (plan->inc - 1);
@@ -192,13 +192,41 @@ void sTranspose_int( const float* __restrict__ A, float* __restrict__ B, const _
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
-   if( plan->next != nullptr )
-      for(size_t i = plan->start; i < end; i+= inc)
-         // recurse
-         sTranspose_int<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
-   else 
+   const size_t remainder = (plan->end - plan->start) % inc;
+
+   if( plan->next->next != nullptr ){
+      // recurse
+      size_t i;
+      for(i = plan->start; i < end; i+= inc)
+         sTranspose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+      // remainder
+      if( remainder == 16 ){
+         if( lda_ == 1)
+            sTranspose_int<16, blockingB, betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         else if( ldb_ == 1)
+            sTranspose_int<blockingA, 16, betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         else{
+            TTC_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
+         }
+      }
+   } else {
+      const size_t lda_macro_ = plan->next->lda;
+      const size_t ldb_macro_ = plan->next->ldb;
       // invoke macro-kernel
-      sTranspose<32,32, betaIsZero>(A, lda_, B, ldb_, alpha, beta);
+      size_t i;
+      for(i = plan->start; i < end; i+= inc)
+         sTranspose<blockingA, blockingB, betaIsZero>(&A[i*lda_], lda_macro_, &B[i*ldb_], ldb_macro_, alpha, beta);
+      // remainder
+      if( remainder == 16 ){
+         if( lda_ == 1)
+            sTranspose<16, blockingB, betaIsZero>(&A[i*lda_], lda_macro_, &B[i*ldb_], ldb_macro_, alpha, beta);
+         else if( ldb_ == 1)
+            sTranspose<blockingA, 16, betaIsZero>(&A[i*lda_], lda_macro_, &B[i*ldb_], ldb_macro_, alpha, beta);
+         else{
+            TTC_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
+         }
+      }
+   }
 }
 
 template<int betaIsZero>
@@ -245,29 +273,6 @@ void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __re
    printf("}\n");
 }
 
-void Transpose::trashCaches()
-{
-#pragma omp parallel for num_threads(numThreads_)
-   for(int i=0; i < trashSize_ ; ++i){
-      trash1_[i] += 1.01 * trash2_[i];
-   }
-}
-void Transpose::createPlan()
-{
-   std::vector<ComputeNode*> allPlans;
-   createPlans(allPlans);
-
-   rootNodes_ = selectPlan( allPlans );
-   
-   //delete all other plans
-   for( int i=0; i < allPlans.size(); i++ ){
-      if( allPlans[i] != nullptr && allPlans[i] != rootNodes_ )
-      {
-         delete[] allPlans[i];
-         allPlans[i] = nullptr;
-      }
-   }
-}
 void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
 {
    if( rootNodes == nullptr ) {
@@ -275,27 +280,23 @@ void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
       exit(-1);
    }
    
-   if ( perm_[0] != 0 )
-   {
+#pragma omp parallel num_threads(numThreads_)
+   if ( perm_[0] != 0 ) {
       //broadcast reg_alpha
       __m256 reg_alpha = _mm256_set1_ps(0.0); // do not alter the content of B
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
 
-      if( std::fabs(beta_) < 1e-8 ) {
-#pragma omp parallel num_threads(numThreads_)
-         sTranspose_int<1>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+      if( std::fabs(beta_) < 1e-17 ) {
+         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
       } else {
-#pragma omp parallel num_threads(numThreads_)
-         sTranspose_int<0>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
       }
    } else {
-      if( std::fabs(beta_) < 1e-8 ) {
-#pragma omp parallel num_threads(numThreads_)
-         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
-      }else{
-#pragma omp parallel num_threads(numThreads_)
+      if( std::fabs(beta_) < 1e-17 ) {
          sTranspose_int_constStride1<1>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+      }else{
+         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
       }
    }
 }
@@ -307,26 +308,22 @@ void Transpose::execute() noexcept
       exit(-1);
    }
    
-   if ( perm_[0] != 0 )
-   {
+#pragma omp parallel num_threads(numThreads_)
+   if ( perm_[0] != 0 ) {
       //broadcast reg_alpha
       __m256 reg_alpha = _mm256_set1_ps(alpha_);
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(beta_);
 
-      if( std::fabs(beta_) < 1e-8 ) {
-#pragma omp parallel num_threads(numThreads_)
-         sTranspose_int<1>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+      if( std::fabs(beta_) < 1e-17 ) {
+         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
       } else {
-#pragma omp parallel num_threads(numThreads_)
-         sTranspose_int<0>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
       }
    } else {
-      if( std::fabs(beta_) < 1e-8 ) {
-#pragma omp parallel num_threads(numThreads_)
+      if( std::fabs(beta_) < 1e-17 ) {
          sTranspose_int_constStride1<1>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
       } else {
-#pragma omp parallel num_threads(numThreads_)
          sTranspose_int_constStride1<0>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
       }
 //      sTranspose_int_constStride1_print( A_, B_, &rootNodes_[omp_get_thread_num()], 0);
@@ -426,7 +423,8 @@ void Transpose::getParallelismStrategies(std::list<std::vector<int> > &paralleli
    // stride-1 index of B (due to false sharing)
    std::list<int> primeFactors;
    getPrimeFactors( numThreads_, primeFactors );
-   printVector(primeFactors,"primes");
+   if( this->infoLevel_ > 0 )
+      printVector(primeFactors,"primes");
 
    std::vector<int> availableParallelismAtLoop;
    this->getAvailableParallelism( availableParallelismAtLoop);
@@ -664,6 +662,30 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
       }
 }
 
+void Transpose::trashCaches()
+{
+#pragma omp parallel for num_threads(numThreads_)
+   for(int i=0; i < trashSize_ ; ++i){
+      trash1_[i] += 1.01 * trash2_[i];
+   }
+}
+void Transpose::createPlan()
+{
+   std::vector<ComputeNode*> allPlans;
+   createPlans(allPlans);
+
+   rootNodes_ = selectPlan( allPlans );
+   
+   //delete all other plans
+   for( int i=0; i < allPlans.size(); i++ ){
+      if( allPlans[i] != nullptr && allPlans[i] != rootNodes_ )
+      {
+         delete[] allPlans[i];
+         allPlans[i] = nullptr;
+      }
+   }
+}
+
 void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
 {
    std::list<std::vector<int> > parallelismStrategies;
@@ -672,7 +694,7 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
 
-   if( perm_[0] != 0 && ( sizeA_[0] % blocking_ != 0 || sizeA_[perm_[0]] % blocking_ != 0 ) ) {
+   if( perm_[0] != 0 && ( sizeA_[0] % 16 != 0 || sizeA_[perm_[0]] % 16 != 0 ) ) {
       printf("Error/TODO: vectorization of remainder\n");
       exit(-1);
    }
@@ -715,7 +737,7 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
                const int commId = (threadIdComm/numThreadsPerComm);
                threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
 
-               currentNode->start = commId * workPerThread * currentNode->inc;
+               currentNode->start = std::min( sizeA_[index], commId * workPerThread * currentNode->inc );
                currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
 
                currentNode->lda = lda_[index];

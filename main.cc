@@ -40,8 +40,6 @@ void equal_(const float *A, const float*B, int total_size){
    }
    if( error > 0 ) 
      printf("ERROR\n");
-  else
-     printf("SUCCESS\n");
 }
 
 void restore(const float* A, float* B, size_t n)
