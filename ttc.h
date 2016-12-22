@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 
+#include "ttc_utils.h"
+
 namespace ttc {
 
 #ifdef DEBUG
@@ -34,6 +36,31 @@ class ComputeNode{
    ComputeNode *next;
 };
 
+class Plan{
+   public:
+      Plan(int numThreads, std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop) : numThreads_(numThreads), rootNodes_(nullptr), loopOrder_(loopOrder), numThreadsAtLoop_(numThreadsAtLoop) {
+         rootNodes_ = new ComputeNode[numThreads];
+      }
+
+      ~Plan() {
+         if ( rootNodes_ != nullptr )
+            delete[] rootNodes_;
+      }
+
+      void print() const {
+         printVector(loopOrder_,"LoopOrder");
+         printVector(numThreadsAtLoop_,"Parallelization");
+      }
+      const ComputeNode* getRootNode_const(int threadId) const { return &rootNodes_[threadId]; }
+      ComputeNode* getRootNode(int threadId) const { return &rootNodes_[threadId]; }
+
+   private:
+      int numThreads_;
+      std::vector<int> loopOrder_;
+      std::vector<int> numThreadsAtLoop_;
+      ComputeNode *rootNodes_;
+};
+
 enum SelectionMethod { ESTIMATE, MEASURE, PATIENT, CRAZY };
 
 class Transpose{
@@ -60,12 +87,12 @@ class Transpose{
          beta_(beta),
          dim_(-1),
          numThreads_(numThreads), 
-         rootNodes_(nullptr),
+         masterPlan_(nullptr),
          blocking_(32),
          blocking_constStride1_(1), //TODO
          trash1_(nullptr),
          trash2_(nullptr),
-         infoLevel_(0),
+         infoLevel_(2),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);
@@ -95,8 +122,8 @@ class Transpose{
       }
 
       ~Transpose() { 
-         if ( rootNodes_ != nullptr ){
-            delete[] rootNodes_;
+         if ( masterPlan_!= nullptr ){
+            delete masterPlan_;
          }
          if( trash1_ != nullptr )
             delete[] trash1_;
@@ -127,8 +154,8 @@ class Transpose{
       /***************************************************
        * Private Methods
        ***************************************************/
-      void createPlans( std::vector<ComputeNode*> &plans ) const;
-      ComputeNode* selectPlan( const std::vector<ComputeNode*> &plans );
+      void createPlans( std::vector<Plan*> &plans ) const;
+      Plan* selectPlan( const std::vector<Plan*> &plans );
       void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
       void computeLeadingDimensions();
       void trashCaches();
@@ -138,7 +165,7 @@ class Transpose{
       /***************************************************
        * Helper Methods
        ***************************************************/
-      float estimateExecutionTime( const ComputeNode *rootNodes ); //execute just a few iterations and exterpolate the result
+      float estimateExecutionTime( const Plan *plan); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
       void getParallelismStrategies(std::list<std::vector<int> > &parallelismStrategies) const;
@@ -147,7 +174,7 @@ class Transpose{
             std::vector<int> &achievedParallelismAtLoop, 
             std::list<std::vector<int> > &parallelismStrategies) const;
       void getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const;
-      void executeEstimate(const ComputeNode *rootNodes) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
+      void executeEstimate(const Plan *plan) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
       double getTimeLimit() const;
 
       const float* __restrict__ A_;
@@ -163,7 +190,7 @@ class Transpose{
       std::vector<size_t> ldb_; 
       int numThreads_;
 
-      ComputeNode *rootNodes_; //one for each thread
+      Plan *masterPlan_; 
       SelectionMethod selectionMethod_;
       int blocking_;
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions

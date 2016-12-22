@@ -273,9 +273,9 @@ void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __re
    printf("}\n");
 }
 
-void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
+void Transpose::executeEstimate(const Plan *plan) noexcept
 {
-   if( rootNodes == nullptr ) {
+   if( plan == nullptr ) {
       printf("ERROR: plan has not yet been created.\n");
       exit(-1);
    }
@@ -287,23 +287,25 @@ void Transpose::executeEstimate(const ComputeNode *rootNodes) noexcept
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
 
+      auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, rootNode );
       } else {
-         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, &rootNodes[omp_get_thread_num()] );
+         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, rootNode );
       }
    } else {
+      auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int_constStride1<1>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+         sTranspose_int_constStride1<1>( A_, B_, 0.0, 1.0, rootNode);
       }else{
-         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, &rootNodes[omp_get_thread_num()]);
+         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, rootNode);
       }
    }
 }
 
 void Transpose::execute() noexcept
 {
-   if( rootNodes_ == nullptr ) {
+   if( masterPlan_ == nullptr ) {
       printf("ERROR: plan has not yet been created.\n");
       exit(-1);
    }
@@ -315,19 +317,19 @@ void Transpose::execute() noexcept
       //broadcast reg_beta
       __m256 reg_beta = _mm256_set1_ps(beta_);
 
+      auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+         sTranspose_int<32,32,1>( A_, B_, reg_alpha, reg_beta, rootNode );
       } else {
-         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, &rootNodes_[omp_get_thread_num()] );
+         sTranspose_int<32,32,0>( A_, B_, reg_alpha, reg_beta, rootNode );
       }
    } else {
+      auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int_constStride1<1>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+         sTranspose_int_constStride1<1>( A_, B_, alpha_, beta_, rootNode);
       } else {
-         sTranspose_int_constStride1<0>( A_, B_, alpha_, beta_, &rootNodes_[omp_get_thread_num()]);
+         sTranspose_int_constStride1<0>( A_, B_, alpha_, beta_, rootNode);
       }
-//      sTranspose_int_constStride1_print( A_, B_, &rootNodes_[omp_get_thread_num()], 0);
-//      exit(-1);
    }
 }
 
@@ -671,22 +673,22 @@ void Transpose::trashCaches()
 }
 void Transpose::createPlan()
 {
-   std::vector<ComputeNode*> allPlans;
+   std::vector<Plan*> allPlans;
    createPlans(allPlans);
 
-   rootNodes_ = selectPlan( allPlans );
+   masterPlan_ = selectPlan( allPlans );
    
    //delete all other plans
    for( int i=0; i < allPlans.size(); i++ ){
-      if( allPlans[i] != nullptr && allPlans[i] != rootNodes_ )
+      if( allPlans[i] != nullptr && allPlans[i] != masterPlan_ )
       {
-         delete[] allPlans[i];
+         delete allPlans[i];
          allPlans[i] = nullptr;
       }
    }
 }
 
-void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
+void Transpose::createPlans( std::vector<Plan*> &plans ) const
 {
    std::list<std::vector<int> > parallelismStrategies;
    this->getParallelismStrategies(parallelismStrategies);
@@ -703,12 +705,12 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
    {
       for( auto loopOrder : loopOrders)
       {
-         ComputeNode *rootNodes = new ComputeNode[numThreads_];
+         Plan *plan = new Plan(numThreads_, loopOrder, numThreadsAtLoop );
 
 #pragma omp parallel num_threads(numThreads_)
          {
             int threadId = omp_get_thread_num();
-            ComputeNode *currentNode = &rootNodes[threadId];
+            ComputeNode *currentNode = plan->getRootNode(threadId);
 
             int posStride1A_inB = findPos(0, perm_);
             int posStride1B_inA = perm_[0];
@@ -760,7 +762,7 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
                currentNode->next = nullptr;
             }
          }
-         plans.push_back(rootNodes);
+         plans.push_back(plan);
       }
    }
 }
@@ -768,12 +770,12 @@ void Transpose::createPlans( std::vector<ComputeNode*> &plans ) const
 /**
  * Estimates the time in seconds for the given computeTree
  */
-float Transpose::estimateExecutionTime( const ComputeNode *rootNodes )
+float Transpose::estimateExecutionTime( const Plan *plan)
 {
    this->trashCaches();
 
    double startTime = omp_get_wtime();
-   this->executeEstimate(rootNodes);
+   this->executeEstimate(plan);
    double elapsedTime = omp_get_wtime() - startTime;
 
    const double minMeasurementTime = 0.1; // in seconds
@@ -784,7 +786,7 @@ float Transpose::estimateExecutionTime( const ComputeNode *rootNodes )
    //execute just a few iterations and exterpolate the result
    startTime = omp_get_wtime();
    for(int i=0;i < nRepeat ; ++i) //ATTENTION: we are not clearing the caches inbetween runs
-      this->executeEstimate( rootNodes );
+      this->executeEstimate( plan );
    elapsedTime = omp_get_wtime() - startTime;
    elapsedTime /= nRepeat;
 
@@ -811,7 +813,7 @@ double Transpose::getTimeLimit() const
    return -1;
 }
 
-ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
+Plan* Transpose::selectPlan( const std::vector<Plan*> &plans)
 {
    if( plans.size() <= 0 ){
       printf("Internal error: not enough plans generated.\n");
@@ -840,9 +842,17 @@ ComputeNode* Transpose::selectPlan( const std::vector<ComputeNode*> &plans)
             bestPlan_id = plan_id;
             minTime = estimatedTime;
          }
+         if( this->infoLevel_ > 1 ){
+            printf("Plan %d will take roughly %f ms.\n", plan_id, estimatedTime * 1000.);
+            plans[bestPlan_id]->print();
+         }
       }
       if( this->infoLevel_ > 0 )
          printf("We evaluated %d/%d candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
+   }
+   if( this->infoLevel_ > 0 ){
+      printf("Configuration of best plan:\n");
+      plans[bestPlan_id]->print();
    }
    return plans[bestPlan_id];
 }
