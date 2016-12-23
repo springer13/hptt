@@ -116,8 +116,8 @@ class Transpose{
 
 #pragma omp parallel for num_threads(numThreads_)
          for(int i=0;i < trashSize_ ; ++i){
-            trash1_[i] = (((i+1) * 13) % 10000) / 10000.;
-            trash2_[i] = (((i+1) * 13) % 10000) / 10000.;
+            trash1_[i] = (((i+1) * 13) % 100) / 100.;
+            trash2_[i] = (((i+1) * 17) % 100) / 100.;
          }
       }
 

@@ -1,0 +1,684 @@
+./transpose.exe 2 1 0 7248 7248 
+numThreads: 20
+permutation: 1,0,
+size: 7264,7264,
+dim: 2
+primes: 2, 2, 5, 
+available Parallelism: 227, 227, 
+We evaluated 12/12 candidates and selected candidate 0.
+Configuration of best plan:
+LoopOrder: 0, 1, 
+Parallelization: 10, 2, 
+TTC (paul): 11.92 ms. 49.48 GiB/s
+./transpose.exe 2 1 0 43408 1216 
+numThreads: 20
+permutation: 1,0,
+size: 43408,1216,
+dim: 2
+primes: 2, 2, 5, 
+available Parallelism: 1357, 38, 
+We evaluated 12/12 candidates and selected candidate 1.
+Configuration of best plan:
+LoopOrder: 1, 0, 
+Parallelization: 10, 2, 
+TTC (paul): 10.72 ms. 55.03 GiB/s
+./transpose.exe 2 1 0 1216 43408 
+numThreads: 20
+permutation: 1,0,
+size: 1216,43408,
+dim: 2
+primes: 2, 2, 5, 
+available Parallelism: 38, 1357, 
+We evaluated 12/12 candidates and selected candidate 0.
+Configuration of best plan:
+LoopOrder: 0, 1, 
+Parallelization: 2, 10, 
+TTC (paul): 10.55 ms. 55.92 GiB/s
+./transpose.exe 3 0 2 1 368 384 384 
+numThreads: 20
+permutation: 0,2,1,
+size: 368,384,384,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 368, 384, 384, 
+We evaluated 36/36 candidates and selected candidate 8.
+Configuration of best plan:
+LoopOrder: 1, 2, 0, 
+Parallelization: 1, 2, 10, 
+TTC (paul): 8.87 ms. 68.35 GiB/s
+./transpose.exe 3 0 2 1 2144 64 384 
+numThreads: 20
+permutation: 0,2,1,
+size: 2144,64,384,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 2144, 64, 384, 
+We evaluated 36/36 candidates and selected candidate 19.
+Configuration of best plan:
+LoopOrder: 2, 1, 0, 
+Parallelization: 5, 1, 4, 
+TTC (paul): 8.69 ms. 67.79 GiB/s
+./transpose.exe 3 0 2 1 368 64 2307 
+numThreads: 20
+permutation: 0,2,1,
+size: 368,64,2307,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 368, 64, 2307, 
+We evaluated 36/36 candidates and selected candidate 25.
+Configuration of best plan:
+LoopOrder: 2, 1, 0, 
+Parallelization: 1, 10, 2, 
+TTC (paul): 9.02 ms. 67.34 GiB/s
+./transpose.exe 3 1 0 2 384 384 355 
+numThreads: 20
+permutation: 1,0,2,
+size: 384,384,355,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 12, 12, 355, 
+We evaluated 108/108 candidates and selected candidate 30.
+Configuration of best plan:
+LoopOrder: 2, 0, 1, 
+Parallelization: 1, 2, 10, 
+TTC (paul): 9.37 ms. 62.46 GiB/s
+./transpose.exe 3 1 0 2 2320 384 59 
+numThreads: 20
+permutation: 1,0,2,
+size: 2320,384,59,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 73, 12, 59, 
+We evaluated 108/108 candidates and selected candidate 3.
+Configuration of best plan:
+LoopOrder: 2, 1, 0, 
+Parallelization: 1, 2, 10, 
+TTC (paul): 9.76 ms. 60.19 GiB/s
+./transpose.exe 3 1 0 2 384 2320 59 
+numThreads: 20
+permutation: 1,0,2,
+size: 384,2320,59,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 12, 73, 59, 
+We evaluated 108/108 candidates and selected candidate 2.
+Configuration of best plan:
+LoopOrder: 2, 0, 1, 
+Parallelization: 2, 1, 10, 
+TTC (paul): 9.91 ms. 59.30 GiB/s
+./transpose.exe 3 2 1 0 384 355 384 
+numThreads: 20
+permutation: 2,1,0,
+size: 384,355,384,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 12, 355, 12, 
+We evaluated 108/108 candidates and selected candidate 41.
+Configuration of best plan:
+LoopOrder: 2, 0, 1, 
+Parallelization: 5, 1, 4, 
+TTC (paul): 12.66 ms. 46.20 GiB/s
+./transpose.exe 3 2 1 0 2320 59 384 
+numThreads: 20
+permutation: 2,1,0,
+size: 2320,59,384,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 73, 59, 12, 
+We evaluated 108/108 candidates and selected candidate 28.
+Configuration of best plan:
+LoopOrder: 2, 0, 1, 
+Parallelization: 5, 1, 4, 
+TTC (paul): 12.49 ms. 47.02 GiB/s
+./transpose.exe 3 2 1 0 384 59 2320 
+numThreads: 20
+permutation: 2,1,0,
+size: 384,59,2320,
+dim: 3
+primes: 2, 2, 5, 
+available Parallelism: 12, 59, 73, 
+We evaluated 108/108 candidates and selected candidate 12.
+Configuration of best plan:
+LoopOrder: 1, 0, 2, 
+Parallelization: 4, 1, 5, 
+TTC (paul): 12.72 ms. 46.16 GiB/s
+./transpose.exe 4 0 3 2 1 80 96 75 96 
+numThreads: 20
+permutation: 0,3,2,1,
+size: 80,96,75,96,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 80, 96, 75, 96, 
+We evaluated 170/240 candidates and selected candidate 66.
+Configuration of best plan:
+LoopOrder: 2, 1, 3, 0, 
+Parallelization: 1, 4, 1, 5, 
+TTC (paul): 9.53 ms. 64.87 GiB/s
+./transpose.exe 4 0 3 2 1 464 16 75 96 
+numThreads: 20
+permutation: 0,3,2,1,
+size: 464,16,75,96,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 464, 16, 75, 96, 
+We evaluated 204/240 candidates and selected candidate 181.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 0, 
+Parallelization: 1, 5, 1, 4, 
+TTC (paul): 8.96 ms. 66.70 GiB/s
+./transpose.exe 4 0 3 2 1 80 16 75 582 
+numThreads: 20
+permutation: 0,3,2,1,
+size: 80,16,75,582,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 80, 16, 75, 582, 
+We evaluated 159/240 candidates and selected candidate 37.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 0, 
+Parallelization: 1, 2, 1, 10, 
+TTC (paul): 9.58 ms. 65.21 GiB/s
+./transpose.exe 4 2 1 3 0 96 75 96 75 
+numThreads: 20
+permutation: 2,1,3,0,
+size: 96,75,96,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 75, 3, 75, 
+We evaluated 178/960 candidates and selected candidate 0.
+Configuration of best plan:
+LoopOrder: 3, 1, 0, 2, 
+Parallelization: 1, 5, 1, 4, 
+TTC (paul): 11.83 ms. 48.97 GiB/s
+./transpose.exe 4 2 1 3 0 608 12 96 75 
+numThreads: 20
+permutation: 2,1,3,0,
+size: 608,12,96,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 19, 12, 3, 75, 
+We evaluated 171/960 candidates and selected candidate 119.
+Configuration of best plan:
+LoopOrder: 0, 3, 2, 1, 
+Parallelization: 10, 1, 1, 2, 
+TTC (paul): 13.05 ms. 45.00 GiB/s
+./transpose.exe 4 2 1 3 0 96 12 608 75 
+numThreads: 20
+permutation: 2,1,3,0,
+size: 96,12,608,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 12, 19, 75, 
+We evaluated 185/960 candidates and selected candidate 72.
+Configuration of best plan:
+LoopOrder: 3, 1, 0, 2, 
+Parallelization: 1, 2, 5, 2, 
+TTC (paul): 11.06 ms. 53.08 GiB/s
+./transpose.exe 4 2 0 3 1 96 75 96 75 
+numThreads: 20
+permutation: 2,0,3,1,
+size: 96,75,96,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 75, 3, 75, 
+We evaluated 198/960 candidates and selected candidate 81.
+Configuration of best plan:
+LoopOrder: 1, 0, 3, 2, 
+Parallelization: 1, 5, 1, 4, 
+TTC (paul): 10.29 ms. 56.31 GiB/s
+./transpose.exe 4 2 0 3 1 608 12 96 75 
+numThreads: 20
+permutation: 2,0,3,1,
+size: 608,12,96,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 19, 12, 3, 75, 
+We evaluated 182/960 candidates and selected candidate 117.
+Configuration of best plan:
+LoopOrder: 3, 2, 0, 1, 
+Parallelization: 10, 1, 1, 2, 
+TTC (paul): 11.38 ms. 51.59 GiB/s
+./transpose.exe 4 2 0 3 1 96 12 608 75 
+numThreads: 20
+permutation: 2,0,3,1,
+size: 96,12,608,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 12, 19, 75, 
+We evaluated 199/960 candidates and selected candidate 16.
+Configuration of best plan:
+LoopOrder: 1, 3, 0, 2, 
+Parallelization: 1, 4, 1, 5, 
+TTC (paul): 10.43 ms. 56.26 GiB/s
+./transpose.exe 4 1 0 3 2 96 96 75 75 
+numThreads: 20
+permutation: 1,0,3,2,
+size: 96,96,75,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 3, 75, 75, 
+We evaluated 215/960 candidates and selected candidate 3.
+Configuration of best plan:
+LoopOrder: 3, 2, 0, 1, 
+Parallelization: 1, 1, 4, 5, 
+TTC (paul): 8.77 ms. 66.06 GiB/s
+./transpose.exe 4 1 0 3 2 608 96 12 75 
+numThreads: 20
+permutation: 1,0,3,2,
+size: 608,96,12,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 19, 3, 12, 75, 
+We evaluated 216/960 candidates and selected candidate 4.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 0, 
+Parallelization: 1, 1, 4, 5, 
+TTC (paul): 9.05 ms. 64.86 GiB/s
+./transpose.exe 4 1 0 3 2 96 608 12 75 
+numThreads: 20
+permutation: 1,0,3,2,
+size: 96,608,12,75,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 19, 12, 75, 
+We evaluated 214/960 candidates and selected candidate 0.
+Configuration of best plan:
+LoopOrder: 2, 3, 0, 1, 
+Parallelization: 1, 1, 4, 5, 
+TTC (paul): 9.04 ms. 64.93 GiB/s
+./transpose.exe 4 3 2 1 0 96 75 75 96 
+numThreads: 20
+permutation: 3,2,1,0,
+size: 96,75,75,96,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 75, 75, 3, 
+We evaluated 174/960 candidates and selected candidate 4.
+Configuration of best plan:
+LoopOrder: 1, 2, 3, 0, 
+Parallelization: 1, 4, 5, 1, 
+TTC (paul): 12.33 ms. 46.98 GiB/s
+./transpose.exe 4 3 2 1 0 608 12 75 96 
+numThreads: 20
+permutation: 3,2,1,0,
+size: 608,12,75,96,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 19, 12, 75, 3, 
+We evaluated 173/960 candidates and selected candidate 9.
+Configuration of best plan:
+LoopOrder: 2, 1, 3, 0, 
+Parallelization: 1, 4, 5, 1, 
+TTC (paul): 12.98 ms. 45.23 GiB/s
+./transpose.exe 4 3 2 1 0 96 12 75 608 
+numThreads: 20
+permutation: 3,2,1,0,
+size: 96,12,75,608,
+dim: 4
+primes: 2, 2, 5, 
+available Parallelism: 3, 12, 75, 19, 
+We evaluated 167/960 candidates and selected candidate 125.
+Configuration of best plan:
+LoopOrder: 2, 3, 0, 1, 
+Parallelization: 1, 2, 1, 10, 
+TTC (paul): 12.81 ms. 45.82 GiB/s
+./transpose.exe 5 0 4 2 1 3 32 48 28 28 48 
+numThreads: 20
+permutation: 0,4,2,1,3,
+size: 32,48,28,28,48,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 32, 48, 28, 28, 48, 
+We evaluated 142/1800 candidates and selected candidate 91.
+Configuration of best plan:
+LoopOrder: 3, 2, 1, 4, 0, 
+Parallelization: 1, 1, 2, 2, 5, 
+TTC (paul): 9.80 ms. 65.88 GiB/s
+./transpose.exe 5 0 4 2 1 3 176 8 28 28 48 
+numThreads: 20
+permutation: 0,4,2,1,3,
+size: 176,8,28,28,48,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 176, 8, 28, 28, 48, 
+We evaluated 195/1800 candidates and selected candidate 21.
+Configuration of best plan:
+LoopOrder: 3, 2, 1, 4, 0, 
+Parallelization: 1, 2, 1, 2, 5, 
+TTC (paul): 8.85 ms. 66.91 GiB/s
+./transpose.exe 5 0 4 2 1 3 32 8 28 28 298 
+numThreads: 20
+permutation: 0,4,2,1,3,
+size: 32,8,28,28,298,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 32, 8, 28, 28, 298, 
+We evaluated 151/1800 candidates and selected candidate 90.
+Configuration of best plan:
+LoopOrder: 3, 2, 4, 1, 0, 
+Parallelization: 1, 1, 2, 2, 5, 
+TTC (paul): 10.36 ms. 64.49 GiB/s
+./transpose.exe 5 3 2 1 4 0 48 28 28 48 28 
+numThreads: 20
+permutation: 3,2,1,4,0,
+size: 48,28,28,48,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 28, 28, 2, 28, 
+We evaluated 143/9000 candidates and selected candidate 140.
+Configuration of best plan:
+LoopOrder: 4, 1, 0, 3, 2, 
+Parallelization: 1, 1, 2, 1, 10, 
+TTC (paul): 12.78 ms. 44.23 GiB/s
+./transpose.exe 5 3 2 1 4 0 352 4 28 48 28 
+numThreads: 20
+permutation: 3,2,1,4,0,
+size: 352,4,28,48,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 11, 4, 28, 2, 28, 
+We evaluated 177/9000 candidates and selected candidate 39.
+Configuration of best plan:
+LoopOrder: 4, 1, 3, 2, 0, 
+Parallelization: 1, 1, 10, 1, 2, 
+TTC (paul): 12.63 ms. 46.89 GiB/s
+./transpose.exe 5 3 2 1 4 0 48 4 28 352 28 
+numThreads: 20
+permutation: 3,2,1,4,0,
+size: 48,4,28,352,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 4, 28, 11, 28, 
+We evaluated 182/9000 candidates and selected candidate 21.
+Configuration of best plan:
+LoopOrder: 4, 2, 1, 0, 3, 
+Parallelization: 1, 1, 10, 1, 2, 
+TTC (paul): 12.31 ms. 48.12 GiB/s
+./transpose.exe 5 2 0 4 1 3 48 28 48 28 28 
+numThreads: 20
+permutation: 2,0,4,1,3,
+size: 48,28,48,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 28, 2, 28, 28, 
+We evaluated 232/9000 candidates and selected candidate 160.
+Configuration of best plan:
+LoopOrder: 3, 4, 2, 1, 0, 
+Parallelization: 1, 2, 1, 2, 5, 
+TTC (paul): 9.42 ms. 59.99 GiB/s
+./transpose.exe 5 2 0 4 1 3 352 4 48 28 28 
+numThreads: 20
+permutation: 2,0,4,1,3,
+size: 352,4,48,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 11, 4, 2, 28, 28, 
+We evaluated 219/9000 candidates and selected candidate 42.
+Configuration of best plan:
+LoopOrder: 3, 4, 1, 2, 0, 
+Parallelization: 1, 1, 1, 4, 5, 
+TTC (paul): 9.76 ms. 60.66 GiB/s
+./transpose.exe 5 2 0 4 1 3 48 4 352 28 28 
+numThreads: 20
+permutation: 2,0,4,1,3,
+size: 48,4,352,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 4, 11, 28, 28, 
+We evaluated 231/9000 candidates and selected candidate 56.
+Configuration of best plan:
+LoopOrder: 3, 4, 1, 2, 0, 
+Parallelization: 1, 2, 1, 2, 5, 
+TTC (paul): 9.35 ms. 63.35 GiB/s
+./transpose.exe 5 1 3 0 4 2 48 48 28 28 28 
+numThreads: 20
+permutation: 1,3,0,4,2,
+size: 48,48,28,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 2, 28, 28, 28, 
+We evaluated 236/9000 candidates and selected candidate 63.
+Configuration of best plan:
+LoopOrder: 2, 4, 0, 3, 1, 
+Parallelization: 1, 1, 2, 1, 10, 
+TTC (paul): 9.71 ms. 58.21 GiB/s
+./transpose.exe 5 1 3 0 4 2 352 48 4 28 28 
+numThreads: 20
+permutation: 1,3,0,4,2,
+size: 352,48,4,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 11, 2, 4, 28, 28, 
+We evaluated 205/9000 candidates and selected candidate 125.
+Configuration of best plan:
+LoopOrder: 4, 3, 0, 2, 1, 
+Parallelization: 1, 1, 1, 5, 4, 
+TTC (paul): 10.32 ms. 57.39 GiB/s
+./transpose.exe 5 1 3 0 4 2 48 352 4 28 28 
+numThreads: 20
+permutation: 1,3,0,4,2,
+size: 48,352,4,28,28,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 11, 4, 28, 28, 
+We evaluated 195/9000 candidates and selected candidate 44.
+Configuration of best plan:
+LoopOrder: 2, 4, 3, 0, 1, 
+Parallelization: 1, 1, 2, 1, 10, 
+TTC (paul): 10.16 ms. 58.29 GiB/s
+./transpose.exe 5 4 3 2 1 0 48 28 28 28 48 
+numThreads: 20
+permutation: 4,3,2,1,0,
+size: 48,28,28,28,48,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 28, 28, 28, 2, 
+We evaluated 155/9000 candidates and selected candidate 62.
+Configuration of best plan:
+LoopOrder: 2, 1, 4, 3, 0, 
+Parallelization: 1, 4, 1, 5, 1, 
+TTC (paul): 14.25 ms. 39.66 GiB/s
+./transpose.exe 5 4 3 2 1 0 352 4 28 28 48 
+numThreads: 20
+permutation: 4,3,2,1,0,
+size: 352,4,28,28,48,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 11, 4, 28, 28, 2, 
+We evaluated 181/9000 candidates and selected candidate 122.
+Configuration of best plan:
+LoopOrder: 3, 2, 1, 4, 0, 
+Parallelization: 1, 4, 1, 5, 1, 
+TTC (paul): 12.93 ms. 45.81 GiB/s
+./transpose.exe 5 4 3 2 1 0 48 4 28 28 352 
+numThreads: 20
+permutation: 4,3,2,1,0,
+size: 48,4,28,28,352,
+dim: 5
+primes: 2, 2, 5, 
+available Parallelism: 2, 4, 28, 28, 11, 
+We evaluated 174/9000 candidates and selected candidate 145.
+Configuration of best plan:
+LoopOrder: 1, 3, 2, 0, 4, 
+Parallelization: 1, 4, 5, 1, 1, 
+TTC (paul): 12.73 ms. 46.53 GiB/s
+./transpose.exe 6 0 3 2 5 4 1 16 32 15 32 15 15 
+numThreads: 20
+permutation: 0,3,2,5,4,1,
+size: 16,32,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 16, 32, 15, 32, 15, 15, 
+We evaluated 164/15120 candidates and selected candidate 17.
+Configuration of best plan:
+LoopOrder: 5, 4, 2, 1, 3, 0, 
+Parallelization: 1, 2, 1, 2, 1, 5, 
+TTC (paul): 11.28 ms. 54.78 GiB/s
+./transpose.exe 6 0 3 2 5 4 1 48 10 15 32 15 15 
+numThreads: 20
+permutation: 0,3,2,5,4,1,
+size: 48,10,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 48, 10, 15, 32, 15, 15, 
+We evaluated 194/15120 candidates and selected candidate 25.
+Configuration of best plan:
+LoopOrder: 5, 4, 1, 2, 3, 0, 
+Parallelization: 1, 2, 1, 2, 1, 5, 
+TTC (paul): 9.52 ms. 60.83 GiB/s
+./transpose.exe 6 0 3 2 5 4 1 16 10 15 103 15 15 
+numThreads: 20
+permutation: 0,3,2,5,4,1,
+size: 16,10,15,103,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 16, 10, 15, 103, 15, 15, 
+We evaluated 160/15120 candidates and selected candidate 41.
+Configuration of best plan:
+LoopOrder: 4, 5, 3, 2, 1, 0, 
+Parallelization: 1, 1, 1, 4, 1, 5, 
+TTC (paul): 11.09 ms. 56.07 GiB/s
+./transpose.exe 6 3 2 0 5 1 4 32 15 15 32 15 15 
+numThreads: 20
+permutation: 3,2,0,5,1,4,
+size: 32,15,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 15, 15, 1, 15, 15, 
+We evaluated 192/90720 candidates and selected candidate 164.
+Configuration of best plan:
+LoopOrder: 4, 5, 1, 3, 0, 2, 
+Parallelization: 1, 5, 1, 1, 2, 2, 
+TTC (paul): 10.93 ms. 53.01 GiB/s
+./transpose.exe 6 3 2 0 5 1 4 112 5 15 32 15 15 
+numThreads: 20
+permutation: 3,2,0,5,1,4,
+size: 112,5,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 4, 5, 15, 1, 15, 15, 
+We evaluated 167/90720 candidates and selected candidate 164.
+Configuration of best plan:
+LoopOrder: 4, 5, 1, 3, 0, 2, 
+Parallelization: 1, 5, 1, 1, 2, 2, 
+TTC (paul): 12.62 ms. 53.58 GiB/s
+./transpose.exe 6 3 2 0 5 1 4 32 5 15 112 15 15 
+numThreads: 20
+permutation: 3,2,0,5,1,4,
+size: 32,5,15,112,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 5, 15, 4, 15, 15, 
+We evaluated 161/90720 candidates and selected candidate 130.
+Configuration of best plan:
+LoopOrder: 4, 5, 2, 3, 1, 0, 
+Parallelization: 1, 1, 5, 1, 2, 2, 
+TTC (paul): 12.99 ms. 52.05 GiB/s
+./transpose.exe 6 2 0 4 1 5 3 32 15 32 15 15 15 
+numThreads: 20
+permutation: 2,0,4,1,5,3,
+size: 32,15,32,15,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 15, 1, 15, 15, 15, 
+We evaluated 229/90720 candidates and selected candidate 200.
+Configuration of best plan:
+LoopOrder: 3, 4, 5, 1, 2, 0, 
+Parallelization: 1, 1, 1, 4, 1, 5, 
+TTC (paul): 9.21 ms. 62.91 GiB/s
+./transpose.exe 6 2 0 4 1 5 3 112 5 32 15 15 15 
+numThreads: 20
+permutation: 2,0,4,1,5,3,
+size: 112,5,32,15,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 4, 5, 1, 15, 15, 15, 
+We evaluated 206/90720 candidates and selected candidate 205.
+Configuration of best plan:
+LoopOrder: 3, 4, 5, 1, 2, 0, 
+Parallelization: 1, 5, 1, 2, 1, 2, 
+TTC (paul): 10.07 ms. 67.11 GiB/s
+./transpose.exe 6 2 0 4 1 5 3 32 5 112 15 15 15 
+numThreads: 20
+permutation: 2,0,4,1,5,3,
+size: 32,5,112,15,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 5, 4, 15, 15, 15, 
+We evaluated 206/90720 candidates and selected candidate 181.
+Configuration of best plan:
+LoopOrder: 3, 5, 1, 4, 0, 2, 
+Parallelization: 1, 5, 1, 2, 1, 2, 
+TTC (paul): 10.24 ms. 66.01 GiB/s
+./transpose.exe 6 3 2 5 1 0 4 32 15 15 32 15 15 
+numThreads: 20
+permutation: 3,2,5,1,0,4,
+size: 32,15,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 15, 15, 1, 15, 15, 
+We evaluated 170/90720 candidates and selected candidate 164.
+Configuration of best plan:
+LoopOrder: 4, 5, 1, 3, 0, 2, 
+Parallelization: 1, 5, 1, 1, 2, 2, 
+TTC (paul): 11.74 ms. 49.36 GiB/s
+./transpose.exe 6 3 2 5 1 0 4 112 5 15 32 15 15 
+numThreads: 20
+permutation: 3,2,5,1,0,4,
+size: 112,5,15,32,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 4, 5, 15, 1, 15, 15, 
+We evaluated 151/90720 candidates and selected candidate 143.
+Configuration of best plan:
+LoopOrder: 4, 5, 2, 0, 3, 1, 
+Parallelization: 1, 1, 5, 1, 2, 2, 
+TTC (paul): 13.60 ms. 49.69 GiB/s
+./transpose.exe 6 3 2 5 1 0 4 32 5 15 112 15 15 
+numThreads: 20
+permutation: 3,2,5,1,0,4,
+size: 32,5,15,112,15,15,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 5, 15, 4, 15, 15, 
+We evaluated 149/90720 candidates and selected candidate 130.
+Configuration of best plan:
+LoopOrder: 4, 5, 2, 0, 3, 1, 
+Parallelization: 1, 1, 5, 1, 2, 2, 
+TTC (paul): 13.58 ms. 49.77 GiB/s
+./transpose.exe 6 5 4 3 2 1 0 32 15 15 15 15 32 
+numThreads: 20
+permutation: 5,4,3,2,1,0,
+size: 32,15,15,15,15,32,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 15, 15, 15, 15, 1, 
+We evaluated 191/90720 candidates and selected candidate 14.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 4, 5, 0, 
+Parallelization: 1, 4, 1, 5, 1, 1, 
+TTC (paul): 12.25 ms. 47.28 GiB/s
+./transpose.exe 6 5 4 3 2 1 0 112 5 15 15 15 32 
+numThreads: 20
+permutation: 5,4,3,2,1,0,
+size: 112,5,15,15,15,32,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 4, 5, 15, 15, 15, 1, 
+We evaluated 162/90720 candidates and selected candidate 121.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 5, 4, 0, 
+Parallelization: 1, 5, 4, 1, 1, 1, 
+TTC (paul): 14.80 ms. 45.67 GiB/s
+./transpose.exe 6 5 4 3 2 1 0 32 5 15 15 15 112 
+numThreads: 20
+permutation: 5,4,3,2,1,0,
+size: 32,5,15,15,15,112,
+dim: 6
+primes: 2, 2, 5, 
+available Parallelism: 1, 5, 15, 15, 15, 4, 
+We evaluated 165/90720 candidates and selected candidate 65.
+Configuration of best plan:
+LoopOrder: 2, 3, 1, 0, 4, 5, 
+Parallelization: 1, 1, 4, 1, 5, 1, 
+TTC (paul): 14.43 ms. 46.85 GiB/s
