@@ -1,9 +1,9 @@
-#ifndef TTC_UTILS_H
-#define TTC_UTILS_H
+#ifndef HPTT_UTILS_H
+#define HPTT_UTILS_H
 
 #include <list>
 
-namespace ttc {
+namespace hptt {
 
 template<typename t>
 int hasItem(const std::vector<t> &vec, t value)

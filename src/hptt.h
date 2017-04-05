@@ -1,19 +1,19 @@
-#ifndef TTC_C_H
-#define TTC_C_H
+#ifndef HPTT_H
+#define HPTT_H
 
 #include <list>
 #include <vector>
 
 #include <stdio.h>
 
-#include "ttc_utils.h"
+#include "hptt_utils.h"
 
-namespace ttc {
+namespace hptt {
 
 #ifdef DEBUG
-#define TTC_ERROR_INFO(str) fprintf(stdout, "[INFO] %s:%d : %s\n", __FILE__, __LINE__, str); exit(-1);
+#define HPTT_ERROR_INFO(str) fprintf(stdout, "[INFO] %s:%d : %s\n", __FILE__, __LINE__, str); exit(-1);
 #else
-#define TTC_ERROR_INFO(str)
+#define HPTT_ERROR_INFO(str)
 #endif
 
 extern float *trash1, *trash2;

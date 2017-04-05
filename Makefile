@@ -1,26 +1,13 @@
-CXX_FLAGS=-O3 -qopenmp -xhost -std=c++14
+CXX_FLAGS=-O3 -qopenmp -xhost -std=c++14 -fPIC
 
-SRC=$(wildcard *.cc)
-OBJ=$(SRC:.cc=.o)
-TYPE=cc
-
-INCLUDE_PATH=-I/home/ps072922/projects/ttc-c/include/
-LIB_PATH=-L/home/ps072922/projects/ttc-c/build/src/
-LIBS=-lttc_c
-
-intel: 
-	${MAKE} clean 
-	${MAKE} intel2
-#intel2: CXX=icpc
-#intel2: CXX_FLAGS += -qopenmp -xhost -restrict 
-intel2: all
-
+SRC=$(wildcard ./src/*.cpp)
+OBJ=$(SRC:.cpp=.o)
 
 all: ${OBJ}
-	${CXX} ${OBJ} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} -o transpose.exe
+	${CXX} ${OBJ} ${CXX_FLAGS} -o lib/libhptt.so -shared
 
-%.o: %.${TYPE}
+%.o: %.cpp
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
 clean:
-	rm -rf *.o transpose.exe
+	rm -rf src/*.o lib/libhptt.so

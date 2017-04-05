@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace ttc {
+namespace hptt {
 
 void getPrimeFactors( int n, std::list<int> &primeFactors )
 {

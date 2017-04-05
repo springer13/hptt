@@ -13,8 +13,8 @@
 
 #include <omp.h>
 
-#include "ttc.h"
-#include "ttc_utils.h"
+#include "hptt.h"
+#include "hptt_utils.h"
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -22,7 +22,7 @@
 #define INLINE __attribute__((always_inline))
 #endif
 
-namespace ttc {
+namespace hptt {
 
 static INLINE void prefetch(const float* A, const int lda)
 {
@@ -290,7 +290,7 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
          else if( ldb_ == 1)
             sTranspose_int<blockingA, 16, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else{
-            TTC_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
+            HPTT_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
          }
       }
    } else {
@@ -310,7 +310,7 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
          else if( ldb_ == 1)
             sTranspose<blockingA, 16, betaIsZero>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          else{
-            TTC_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
+            HPTT_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
          }
       }
    }
