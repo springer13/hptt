@@ -1,10 +1,9 @@
-# High-Performance Tensor Transpose library#
+# High-Performance Tensor Transpose library #
 
 The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on the [Tensor Transpose Compiler (TTC)](https://github.com/HPAC/TTC).
 
 
 # Key Features
---------------
 
 * Multi-threading support
 * Explicit vectorization
@@ -15,7 +14,6 @@ available shortly.
 
 
 # Install
----------
 
 1. Clone the repository into a desired directory and change to that location:
 
@@ -30,7 +28,6 @@ This should create 'libhptt.so' insdide the lib folder.
 
 
 # Getting Started
------------------
 
 Please have a look at the provided benchmark.cpp.
 
@@ -53,20 +50,17 @@ In general HPTT is used as follows:
     transpose.execute();
 
 # Requirements
---------------
 
 You must have a working C++ compiler. I have tested HPTT with:
 
 * Intel's ICC (>= 15.0)
 
 # Benchmark
------------
 
 The benchmark is the same as the original TTC benchmark [benchmark for tensor transpositions](https://github.com/HPAC/TTC/blob/master/benchmark/benchmark.py).
 
 
 # Citation
------------
 
 In case you want refer to TTC as part of a research paper, please cite the following
 article [(pdf)](http://arxiv.org/abs/1603.02297):
