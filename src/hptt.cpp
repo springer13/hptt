@@ -127,139 +127,172 @@ static INLINE void sTranspose(const float* __restrict__ A, const float* __restri
                                    float* __restrict__ B, const float* __restrict__ Bnext, const size_t ldb,
                                    const __m256 &reg_alpha ,const __m256 &reg_beta)
 {
+   bool useStreamingStores = true && betaIsZero && (blockingB*4)%64 == 0 && ((uint64_t)B)%32 == 0;
+
+   float *Btmp = B;
+   size_t ldb_tmp = ldb;
+   float buffer[blockingA * blockingB] __attribute__((aligned(64)));
+   if( useStreamingStores ){
+      Btmp = buffer;
+      ldb_tmp = blockingB;
+   }
+
    if( blockingA == 32 && blockingB == 32 )
    {
-      prefetch(Bnext + (0 * ldb + 0), ldb);
+      if( !useStreamingStores )
+         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, B + (0 * ldb + 0), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, B + (0 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (0 * ldb + 16), ldb);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (0 * ldb_tmp + 16), ldb_tmp);
       prefetch(Anext + (16 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, B + (0 * ldb + 16), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, Btmp + (0 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (24 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, B + (0 * ldb + 24), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (8 * ldb + 0), ldb);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, B + (8 * ldb + 0), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, B + (8 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (8 * ldb + 16), ldb);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, B + (8 * ldb + 16), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, B + (8 * ldb + 24), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (16 * ldb + 0), ldb);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, Btmp + (0 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (8 * ldb_tmp + 16), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, Btmp + (8 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, Btmp + (8 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (16 * ldb_tmp + 0), ldb_tmp);
       prefetch(Anext + (0 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, B + (16 * ldb + 0), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, Btmp + (16 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (8 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, B + (16 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (16 * ldb + 16), ldb);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, Btmp + (16 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (16 * ldb_tmp + 16), ldb_tmp);
       prefetch(Anext + (16 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 16), lda, B + (16 * ldb + 16), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 16), lda, Btmp + (16 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (24 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 16), lda, B + (16 * ldb + 24), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (24 * ldb + 0), ldb);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, B + (24 * ldb + 0), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, B + (24 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (24 * ldb + 16), ldb);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 24), lda, B + (24 * ldb + 16), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 24), lda, B + (24 * ldb + 24), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 16), lda, Btmp + (16 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (24 * ldb_tmp + 0), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, Btmp + (24 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, Btmp + (24 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (24 * ldb_tmp + 16), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 24), lda, Btmp + (24 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 24), lda, Btmp + (24 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
    }else if( blockingA == 16 && blockingB == 32 ) {
-      prefetch(Bnext + (0 * ldb + 0), ldb);
+      if( !useStreamingStores )
+         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, B + (0 * ldb + 0), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, B + (0 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (0 * ldb + 16), ldb);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (0 * ldb_tmp + 16), ldb_tmp);
       prefetch(Anext + (16 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, B + (0 * ldb + 16), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, Btmp + (0 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (24 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, B + (0 * ldb + 24), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (8 * ldb + 0), ldb);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, B + (8 * ldb + 0), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, B + (8 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (8 * ldb + 16), ldb);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, B + (8 * ldb + 16), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, B + (8 * ldb + 24), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, Btmp + (0 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (8 * ldb_tmp + 16), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, Btmp + (8 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, Btmp + (8 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
    }else if( blockingA == 32 && blockingB == 16) {
-      prefetch(Bnext + (0 * ldb + 0), ldb);
+      if( !useStreamingStores )
+         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, B + (0 * ldb + 0), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, B + (0 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (8 * ldb + 0), ldb);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, B + (8 * ldb + 0), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, B + (8 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (16 * ldb + 0), ldb);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (16 * ldb_tmp + 0), ldb_tmp);
       prefetch(Anext + (0 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, B + (16 * ldb + 0), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, Btmp + (16 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
       prefetch(Anext + (8 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, B + (16 * ldb + 8), ldb  , reg_alpha , reg_beta);
-      prefetch(Bnext + (24 * ldb + 0), ldb);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, B + (24 * ldb + 0), ldb  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, B + (24 * ldb + 8), ldb  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, Btmp + (16 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+      if( !useStreamingStores )
+         prefetch(Bnext + (24 * ldb_tmp + 0), ldb_tmp);
+      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, Btmp + (24 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, Btmp + (24 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
    } else {
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A, lda, B, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A, lda, Btmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 8 * lda, lda, B + 8, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 8 * lda, lda, Btmp + 8, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 16 * lda, lda, B + 16, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 16 * lda, lda, Btmp + 16, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 24 * lda, lda, B + 24, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 24 * lda, lda, Btmp + 24, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 8 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 8, lda, B + 8 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 8, lda, Btmp + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 8 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 8 + 8 * lda, lda, B + 8 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 8 + 8 * lda, lda, Btmp + 8 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 8 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 8 + 16 * lda, lda, B + 16 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 8 + 16 * lda, lda, Btmp + 16 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 8 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 8 + 24 * lda, lda, B + 24 + 8 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 8 + 24 * lda, lda, Btmp + 24 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 16 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 16, lda, B + 16 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 16, lda, Btmp + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 16 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 16 + 8 * lda, lda, B + 8 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 16 + 8 * lda, lda, Btmp + 8 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 16 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 16 + 16 * lda, lda, B + 16 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 16 + 16 * lda, lda, Btmp + 16 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 16 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 16 + 24 * lda, lda, B + 24 + 16 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 16 + 24 * lda, lda, Btmp + 24 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 24 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 24, lda, B + 24 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 24, lda, Btmp + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 24 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 24 + 8 * lda, lda, B + 8 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 24 + 8 * lda, lda, Btmp + 8 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 24 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 24 + 16 * lda, lda, B + 16 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 24 + 16 * lda, lda, Btmp + 16 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
       if(blockingA > 24 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 24 + 24 * lda, lda, B + 24 + 24 * ldb, ldb  , reg_alpha , reg_beta);
+         sTranspose8x8<betaIsZero>(A + 24 + 24 * lda, lda, Btmp + 24 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
    }
+
+   // write buffer to main-memory via non-temporal stores
+   if( useStreamingStores )
+      for( int i = 0; i < blockingA; i++){
+         for( int j = 0; j < blockingB; j+=8)
+            _mm256_stream_ps((B + i * ldb + j), _mm256_load_ps((buffer + i * ldb_tmp + j)));
+      }
 }
 
 template<int blockingA, int blockingB, int betaIsZero>
