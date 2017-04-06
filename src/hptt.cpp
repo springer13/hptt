@@ -266,16 +266,16 @@ template<int blockingA, int blockingB, int betaIsZero>
 void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anext, 
                      float* __restrict__ B, const float* __restrict__ Bnext, const __m256 alpha, const __m256 beta, const ComputeNode* plan)
 {
-   const size_t end = plan->end - (plan->inc - 1);
-   const size_t inc = plan->inc;
+   const int32_t end = plan->end - (plan->inc - 1);
+   const int32_t inc = plan->inc;
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
-   const size_t remainder = (plan->end - plan->start) % inc;
+   const int32_t remainder = (plan->end - plan->start) % inc;
 
    if( plan->next->next != nullptr ){
       // recurse
-      size_t i;
+      int32_t i;
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
@@ -297,7 +297,7 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
       const size_t lda_macro_ = plan->next->lda;
       const size_t ldb_macro_ = plan->next->ldb;
       // invoke macro-kernel
-      size_t i;
+      int32_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
             sTranspose<blockingA, blockingB, betaIsZero>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta);
@@ -319,8 +319,8 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
 template<int betaIsZero>
 void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, const ComputeNode* plan)
 {
-   const size_t end = plan->end - (plan->inc - 1);
-   const size_t inc = plan->inc;
+   const int32_t end = plan->end - (plan->inc - 1);
+   const int32_t inc = plan->inc;
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
@@ -331,10 +331,10 @@ void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict
    else 
       if( !betaIsZero )
       {
-         for(size_t i = plan->start; i < end; i+= inc)
+         for(int32_t i = plan->start; i < end; i+= inc)
             B[i] = alpha * A[i] + beta * B[i];
       } else {
-         for(size_t i = plan->start; i < end; i+= inc)
+         for(int32_t i = plan->start; i < end; i+= inc)
             B[i] = alpha * A[i];
       }
 }
@@ -342,8 +342,8 @@ void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict
 // prints a plan
 void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __restrict__ B, const ComputeNode* plan, int level)
 {
-   const size_t end = plan->end - (plan->inc - 1);
-   const size_t inc = plan->inc;
+   const int32_t end = plan->end - (plan->inc - 1);
+   const int32_t inc = plan->inc;
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
@@ -639,8 +639,8 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
       perm_[dim_] = perm[i];
       // merge indices if the two consecutive entries are identical
       while(i+1 < dim && perm[i] + 1 == perm[i+1] 
-            && ((outerSizeA == NULL && outerSizeA != nullptr) || sizeA[perm[i]] == outerSizeA[perm[i]]) 
-            && ((outerSizeB == NULL && outerSizeB != nullptr) || sizeA[perm[i]] == outerSizeB[i]) ){ 
+            && (outerSizeA == NULL || outerSizeA == nullptr || sizeA[perm[i]] == outerSizeA[perm[i]]) 
+            && (outerSizeB == NULL || outerSizeB == nullptr || sizeA[perm[i]] == outerSizeB[i]) ){ 
 #ifdef DEBUG
          printf("MERGING indices %d and %d\n",perm[i], perm[i+1]); 
 #endif
@@ -765,13 +765,6 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
       }
 }
 
-void Transpose::trashCaches()
-{
-#pragma omp parallel for num_threads(numThreads_)
-   for(int i=0; i < trashSize_ ; ++i){
-      trash1_[i] += 1.01 * trash2_[i];
-   }
-}
 void Transpose::createPlan()
 {
    std::vector<Plan*> allPlans;
@@ -798,7 +791,7 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
    this->getLoopOrders(loopOrders);
 
    if( perm_[0] != 0 && ( sizeA_[0] % 16 != 0 || sizeA_[perm_[0]] % 16 != 0 ) ) {
-      printf("Error/TODO: vectorization of remainder\n");
+      fprintf(stderr, "Error/TODO: vectorization of remainder\n");
       exit(-1);
    }
 
@@ -878,15 +871,13 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
  */
 float Transpose::estimateExecutionTime( const Plan *plan)
 {
-   this->trashCaches();
-
    double startTime = omp_get_wtime();
    this->executeEstimate(plan);
    double elapsedTime = omp_get_wtime() - startTime;
 
    const double minMeasurementTime = 0.1; // in seconds
 
-   // do aleast 3 repetitions or spent at least 'minMeasurementTime' seconds for each candidate
+   // do at least 3 repetitions or spent at least 'minMeasurementTime' seconds for each candidate
    int nRepeat = std::min(3, (int) std::ceil(minMeasurementTime / elapsedTime));
 
    //execute just a few iterations and exterpolate the result

@@ -16,9 +16,6 @@ namespace hptt {
 #define HPTT_ERROR_INFO(str)
 #endif
 
-extern float *trash1, *trash2;
-extern int trashSize;
-
 class ComputeNode{
    public:
       ComputeNode() : start(-1), end(-1), inc(-1), lda(-1), ldb(-1), next(nullptr) {}
@@ -90,8 +87,6 @@ class Transpose{
          masterPlan_(nullptr),
          blocking_(32),
          blocking_constStride1_(1), //TODO
-         trash1_(nullptr),
-         trash2_(nullptr),
          infoLevel_(1),
          selectionMethod_(selectionMethod)
       {
@@ -109,26 +104,12 @@ class Transpose{
 
          // initializes lda_ and ldb_
          computeLeadingDimensions();
-
-         trashSize_ = 42 * 1024 * 1024 / sizeof(float); //42 MiB
-         trash1_ = new float[trashSize_];
-         trash2_ = new float[trashSize_];
-
-#pragma omp parallel for num_threads(numThreads_)
-         for(int i=0;i < trashSize_ ; ++i){
-            trash1_[i] = (((i+1) * 13) % 100) / 100.;
-            trash2_[i] = (((i+1) * 17) % 100) / 100.;
-         }
       }
 
       ~Transpose() { 
          if ( masterPlan_!= nullptr ){
             delete masterPlan_;
          }
-         if( trash1_ != nullptr )
-            delete[] trash1_;
-         if( trash2_ != nullptr )
-            delete[] trash2_;
       }
 
       /***************************************************
@@ -158,7 +139,6 @@ class Transpose{
       Plan* selectPlan( const std::vector<Plan*> &plans );
       void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
       void computeLeadingDimensions();
-      void trashCaches();
       double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
       double parallelismCostHeuristic( const std::vector<int> &loopOrder ) const;
 
@@ -196,12 +176,8 @@ class Transpose{
       int blocking_;
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      float *trash1_, *trash2_;
-      int trashSize_;
-
       int infoLevel_; // determines which auxiliary messages should be printed
 };
-
 
 void trashCache(double *A, double *B, int n);
 

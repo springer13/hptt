@@ -1,4 +1,4 @@
-rm -f ttc_benchmark.dat
+rm -f hptt_benchmark.dat
 for i in `seq 1 5`;
 do
    KMP_AFFINITY=compact,1 OMP_NUM_THREADS=24 ./benchmark.exe 2 1 0 7264 7264 | grep GiB > tmp.dat 
