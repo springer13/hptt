@@ -18,8 +18,8 @@
 
 #include <ttc_c.h>
 
-#define ORIG_TTC
-#define RELEASE_HPTT
+//#define ORIG_TTC
+//#define RELEASE_HPTT
 
 int equal_(const float *A, const float*B, int total_size){
   int error = 0;
@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
   printf("numThreads: %d\n",numThreads);
   float alpha = 2.2;
   float beta = 4.1;
+  beta = 0; //TODO
 
   if( argc < 2 ){
      printf("Usage: <dim> <permutation each index separated by ' '> <size of each index separated by ' '>\n");
@@ -174,8 +175,8 @@ int main(int argc, char *argv[])
         size_[i] = (int)size[i];
      }
 
-     hptt::Transpose transpose( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::MEASURE, numThreads );
-     transpose.createPlan();
+     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::MEASURE, numThreads );
+//     transpose.createPlan();
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
@@ -183,7 +184,7 @@ int main(int argc, char *argv[])
         hptt::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
-        transpose.execute();
+        plan->execute();
         auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }

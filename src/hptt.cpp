@@ -24,15 +24,72 @@
 
 namespace hptt {
 
-static INLINE void prefetch(const float* A, const int lda)
+template<typename floatType>
+static INLINE void prefetch(const floatType* A, const int lda)
 {
-   for(int i=0;i < 8 ; ++i)
+   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
+   for(int i=0;i < blocking_micro_; ++i)
       _mm_prefetch((char*)(A + i * lda), _MM_HINT_T2);
 }
 
+//template<typename floatType, typename regType, int betaIsZero>
+//static INLINE void micro_kernel(const floatType* __restrict__ A, const size_t lda, floatType* __restrict__ B, const size_t ldb, const regType &reg_alpha ,const regType &reg_beta);
+//
+//template<int betaIsZero>
+//static INLINE void micro_kernel<double, __m256d, betaIsZero>(const double* __restrict__ A, const size_t lda, double* __restrict__ B, const size_t ldb, const __m256d &reg_alpha ,const __m256d &reg_beta)
+//{
+//   //Load A
+//   __m256d rowA0 = _mm256_load_pd((A + 0 +0*lda));
+//   __m256d rowA1 = _mm256_load_pd((A + 0 +1*lda));
+//   __m256d rowA2 = _mm256_load_pd((A + 0 +2*lda));
+//   __m256d rowA3 = _mm256_load_pd((A + 0 +3*lda));
+//
+//   //4x4 transpose micro kernel
+//   __m256d r4, r34, r3, r33;
+//   r33 = _mm256_shuffle_pd( rowA2, rowA3, 0x3 );
+//    r3 = _mm256_shuffle_pd( rowA0, rowA1, 0x3 );
+//   r34 = _mm256_shuffle_pd( rowA2, rowA3, 0xc );
+//    r4 = _mm256_shuffle_pd( rowA0, rowA1, 0xc );
+//   rowA0 = _mm256_permute2f128_pd( r34, r4, 0x2 );
+//   rowA1 = _mm256_permute2f128_pd( r33, r3, 0x2 );
+//   rowA2 = _mm256_permute2f128_pd( r33, r3, 0x13 );
+//   rowA3 = _mm256_permute2f128_pd( r34, r4, 0x13 );
+//
+//   //Scale A
+//   rowA0 = _mm256_mul_pd(rowA0, reg_alpha);
+//   rowA1 = _mm256_mul_pd(rowA1, reg_alpha);
+//   rowA2 = _mm256_mul_pd(rowA2, reg_alpha);
+//   rowA3 = _mm256_mul_pd(rowA3, reg_alpha);
+//
+//   //Load B
+//   if( !betaIsZero )
+//   {
+//      __m256d rowB0 = _mm256_load_pd((B + 0 +0*ldb));
+//      __m256d rowB1 = _mm256_load_pd((B + 0 +1*ldb));
+//      __m256d rowB2 = _mm256_load_pd((B + 0 +2*ldb));
+//      __m256d rowB3 = _mm256_load_pd((B + 0 +3*ldb));
+//
+//      rowB0 = _mm256_add_pd( _mm256_mul_pd(rowB0, reg_beta), rowA0);
+//      rowB1 = _mm256_add_pd( _mm256_mul_pd(rowB1, reg_beta), rowA1);
+//      rowB2 = _mm256_add_pd( _mm256_mul_pd(rowB2, reg_beta), rowA2);
+//      rowB3 = _mm256_add_pd( _mm256_mul_pd(rowB3, reg_beta), rowA3);
+//      //Store B
+//      _mm256_store_pd((B + 0 + 0 * ldb), rowB0);
+//      _mm256_store_pd((B + 0 + 1 * ldb), rowB1);
+//      _mm256_store_pd((B + 0 + 2 * ldb), rowB2);
+//      _mm256_store_pd((B + 0 + 3 * ldb), rowB3);
+//   } else {
+//      //Store B
+//      _mm256_store_pd((B + 0 + 0 * ldb), rowA0);
+//      _mm256_store_pd((B + 0 + 1 * ldb), rowA1);
+//      _mm256_store_pd((B + 0 + 2 * ldb), rowA2);
+//      _mm256_store_pd((B + 0 + 3 * ldb), rowA3);
+//   }
+//}
+
 //B_ji = alpha * A_ij + beta * B_ji
-template<int betaIsZero>
-static INLINE void sTranspose8x8(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
+template<typename floatType, int betaIsZero>
+static INLINE void micro_kernel(const floatType* __restrict__ A, const size_t lda, floatType* __restrict__ B, const size_t ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
 {
    //Load A
    __m256 rowA0 = _mm256_load_ps((A + 0 +0*lda));
@@ -122,182 +179,190 @@ static INLINE void sTranspose8x8(const float* __restrict__ A, const size_t lda, 
    }
 }
 
-template<int blockingA, int blockingB, int betaIsZero>
-static INLINE void sTranspose(const float* __restrict__ A, const float* __restrict__ Anext, const size_t lda, 
-                                   float* __restrict__ B, const float* __restrict__ Bnext, const size_t ldb,
-                                   const __m256 &reg_alpha ,const __m256 &reg_beta)
+template<int blockingA, int blockingB, int betaIsZero, typename floatType>
+static INLINE void macro_kernel(const float* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
+                                   floatType* __restrict__ B, const floatType* __restrict__ Bnext, const size_t ldb,
+                                   const floatType alpha ,const floatType beta)
 {
-   bool useStreamingStores = true && betaIsZero && (blockingB*4)%64 == 0 && ((uint64_t)B)%32 == 0;
+   constexpr int blocking_ = 128 / sizeof(floatType);
+   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
 
-   float *Btmp = B;
+   //broadcast reg_alpha
+   __m256 reg_alpha = _mm256_set1_ps(alpha); // do not alter the content of B
+   //broadcast reg_beta
+   __m256 reg_beta = _mm256_set1_ps(beta); // do not alter the content of B
+
+   bool useStreamingStores = betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0;
+
+   floatType *Btmp = B;
    size_t ldb_tmp = ldb;
-   float buffer[blockingA * blockingB] __attribute__((aligned(64)));
+   floatType buffer[blockingA * blockingB] __attribute__((aligned(64)));
    if( useStreamingStores ){
       Btmp = buffer;
       ldb_tmp = blockingB;
    }
 
-   if( blockingA == 32 && blockingB == 32 )
+   if( blockingA == blocking_ && blockingB == blocking_ )
    {
       if( !useStreamingStores )
-         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
-      prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
+      prefetch<floatType>(Anext + (0 * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (0 * ldb_tmp + 16), ldb_tmp);
-      prefetch(Anext + (16 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, Btmp + (0 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (24 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, Btmp + (0 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (8 * ldb_tmp + 16), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, Btmp + (8 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, Btmp + (8 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (16 * ldb_tmp + 0), ldb_tmp);
-      prefetch(Anext + (0 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, Btmp + (16 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (8 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, Btmp + (16 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (16 * ldb_tmp + 16), ldb_tmp);
-      prefetch(Anext + (16 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 16), lda, Btmp + (16 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (24 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 16), lda, Btmp + (16 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (24 * ldb_tmp + 0), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, Btmp + (24 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, Btmp + (24 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (24 * ldb_tmp + 16), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 24), lda, Btmp + (24 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 24), lda, Btmp + (24 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
-   }else if( blockingA == 16 && blockingB == 32 ) {
+         prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+   }else if( blockingA == 2*blocking_micro_ && blockingB == blocking_ ) {
       if( !useStreamingStores )
-         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
-      prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
+      prefetch<floatType>(Anext + (0 * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (0 * ldb_tmp + 16), ldb_tmp);
-      prefetch(Anext + (16 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 0), lda, Btmp + (0 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (24 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 0), lda, Btmp + (0 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (8 * ldb_tmp + 16), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (16 * lda + 8), lda, Btmp + (8 * ldb_tmp + 16), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (24 * lda + 8), lda, Btmp + (8 * ldb_tmp + 24), ldb_tmp  , reg_alpha , reg_beta);
-   }else if( blockingA == 32 && blockingB == 16) {
+         prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+   }else if( blockingA == blocking_ && blockingB == 2*blocking_micro_) {
       if( !useStreamingStores )
-         prefetch(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
-      prefetch(Anext + (0 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (8 * lda + 0), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 0), lda, Btmp + (0 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
+      prefetch<floatType>(Anext + (0 * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (8 * ldb_tmp + 0), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 8), lda, Btmp + (8 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 8), lda, Btmp + (8 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (16 * ldb_tmp + 0), ldb_tmp);
-      prefetch(Anext + (0 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 16), lda, Btmp + (16 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      prefetch(Anext + (8 * lda + 16), lda);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 16), lda, Btmp + (16 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
       if( !useStreamingStores )
-         prefetch(Bnext + (24 * ldb_tmp + 0), ldb_tmp);
-      sTranspose8x8<betaIsZero>(A + (0 * lda + 24), lda, Btmp + (24 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      sTranspose8x8<betaIsZero>(A + (8 * lda + 24), lda, Btmp + (24 * ldb_tmp + 8), ldb_tmp  , reg_alpha , reg_beta);
+         prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
+      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
    } else {
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A, lda, Btmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>(A, lda, Btmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 0 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 8 * lda, lda, Btmp + 8, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 0 && blockingB > blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ * lda, lda, Btmp + blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 0 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 16 * lda, lda, Btmp + 16, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 0 && blockingB > 2*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 0 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 24 * lda, lda, Btmp + 24, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 0 && blockingB > 3*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 8 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 8, lda, Btmp + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > blocking_micro_ && blockingB > 0 )
+         micro_kernel<floatType,betaIsZero>(A + blocking_micro_, lda, Btmp + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 8 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 8 + 8 * lda, lda, Btmp + 8 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > blocking_micro_ && blockingB > blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 8 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 8 + 16 * lda, lda, Btmp + 16 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > blocking_micro_ && blockingB > 2*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 8 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 8 + 24 * lda, lda, Btmp + 24 + 8 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > blocking_micro_ && blockingB > 3*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 16 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 16, lda, Btmp + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 2*blocking_micro_ && blockingB > 0 )
+         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_, lda, Btmp + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 16 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 16 + 8 * lda, lda, Btmp + 8 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 2*blocking_micro_ && blockingB > blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 16 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 16 + 16 * lda, lda, Btmp + 16 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 2*blocking_micro_ && blockingB > 2*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 16 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 16 + 24 * lda, lda, Btmp + 24 + 16 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 2*blocking_micro_ && blockingB > 3*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 24 && blockingB > 0 )
-         sTranspose8x8<betaIsZero>(A + 24, lda, Btmp + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 3*blocking_micro_ && blockingB > 0 )
+         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_, lda, Btmp + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 24 && blockingB > 8 )
-         sTranspose8x8<betaIsZero>(A + 24 + 8 * lda, lda, Btmp + 8 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 3*blocking_micro_ && blockingB > blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 24 && blockingB > 16 )
-         sTranspose8x8<betaIsZero>(A + 24 + 16 * lda, lda, Btmp + 16 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 3*blocking_micro_ && blockingB > 2*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
 
       //invoke micro-transpose
-      if(blockingA > 24 && blockingB > 24 )
-         sTranspose8x8<betaIsZero>(A + 24 + 24 * lda, lda, Btmp + 24 + 24 * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+      if(blockingA > 3*blocking_micro_ && blockingB > 3*blocking_micro_ )
+         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
    }
 
    // write buffer to main-memory via non-temporal stores
    if( useStreamingStores )
       for( int i = 0; i < blockingA; i++){
-         for( int j = 0; j < blockingB; j+=8)
+         for( int j = 0; j < blockingB; j+=blocking_micro_)
             _mm256_stream_ps((B + i * ldb + j), _mm256_load_ps((buffer + i * ldb_tmp + j)));
       }
 }
 
-template<int blockingA, int blockingB, int betaIsZero>
-void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anext, 
-                     float* __restrict__ B, const float* __restrict__ Bnext, const __m256 alpha, const __m256 beta, const ComputeNode* plan)
+template<int blockingA, int blockingB, int betaIsZero, typename floatType>
+void sTranspose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
+                     floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
    const int32_t inc = plan->inc;
@@ -305,6 +370,9 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
    const size_t ldb_ = plan->ldb;
 
    const int32_t remainder = (plan->end - plan->start) % inc;
+
+   constexpr int blocking_ = 128 / sizeof(floatType);
+   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
 
    if( plan->next->next != nullptr ){
       // recurse
@@ -317,43 +385,55 @@ void sTranspose_int( const float* __restrict__ A, const float* __restrict__ Anex
             sTranspose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
       }
       // remainder
-      if( remainder == 16 ){
+      if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
          if( lda_ == 1)
-            sTranspose_int<16, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            sTranspose_int<blocking_/2, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else if( ldb_ == 1)
-            sTranspose_int<blockingA, 16, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
-         else{
-            HPTT_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
-         }
+            sTranspose_int<blockingA, blocking_/2, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+         i+=blocking_/2;
       }
+//      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
+//         if( lda_ == 1)
+//            sTranspose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+//         else if( ldb_ == 1)
+//            sTranspose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+//         i+=blocking_/4;
+//      }
+
    } else {
       const size_t lda_macro_ = plan->next->lda;
       const size_t ldb_macro_ = plan->next->ldb;
       // invoke macro-kernel
+      
       int32_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
-            sTranspose<blockingA, blockingB, betaIsZero>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta);
          else
-            sTranspose<blockingA, blockingB, betaIsZero>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
       // remainder
-      if( remainder == 16 ){
+      if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
          if( lda_ == 1)
-            sTranspose<16, blockingB, betaIsZero>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+            macro_kernel<blocking_/2, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          else if( ldb_ == 1)
-            sTranspose<blockingA, 16, betaIsZero>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
-         else{
-            HPTT_ERROR_INFO("Internal error: macro-kernel blocking does not fit.");
-         }
+            macro_kernel<blockingA, blocking_/2, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+         i+=blocking_/2;
       }
+//      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
+//         if( lda_ == 1)
+//            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+//         else if( ldb_ == 1)
+//            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+//         i+=blocking_/4;
+//      }
    }
 }
 
-template<int betaIsZero>
-void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, const ComputeNode* plan)
+template<int betaIsZero, typename floatType>
+void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
-   const int32_t inc = plan->inc;
+   constexpr int32_t inc = 1; // TODO
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
@@ -372,88 +452,61 @@ void sTranspose_int_constStride1( const float* __restrict__ A, float* __restrict
       }
 }
 
-// prints a plan
-void sTranspose_int_constStride1_print( const float* __restrict__ A, float* __restrict__ B, const ComputeNode* plan, int level)
-{
-   const int32_t end = plan->end - (plan->inc - 1);
-   const int32_t inc = plan->inc;
-   const size_t lda_ = plan->lda;
-   const size_t ldb_ = plan->ldb;
 
-   if( plan->next != nullptr ){
-      printf("for(int i%d = %d; i%d < %d; i%d+= %d){ //lda: %d ldb: %d \n", level, plan->start, level, end, level, inc, lda_, ldb_);
-      printf("float *A_ = &A[i%d * %d];\n", level, lda_);
-      printf("float *B_ = &B[i%d * %d];\n", level, ldb_);
-      // recurse
-      sTranspose_int_constStride1_print( A, B, plan->next, level+1);
-   } else { 
-      printf("for(int k = %d; k < %d; k+= %d) //lda: %d ldb: %d \n", plan->start, end, inc, lda_, ldb_);
-      printf("    B[k] = beta * B[k] + alpha * A[k];\n");
-   }
-   printf("}\n");
-}
-
-void Transpose::executeEstimate(const Plan *plan) noexcept
+template<typename floatType>
+void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 {
    if( plan == nullptr ) {
-      printf("ERROR: plan has not yet been created.\n");
+      fprintf(stderr,"ERROR: plan has not yet been created.\n");
       exit(-1);
    }
    
 #pragma omp parallel num_threads(numThreads_)
    if ( perm_[0] != 0 ) {
-      //broadcast reg_alpha
-      __m256 reg_alpha = _mm256_set1_ps(0.0); // do not alter the content of B
-      //broadcast reg_beta
-      __m256 reg_beta = _mm256_set1_ps(1.0); // do not alter the content of B
-
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1>( A_,A_, B_, B_, reg_alpha, reg_beta, rootNode );
+         sTranspose_int<32,32,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       } else {
-         sTranspose_int<32,32,0>( A_,A_, B_, B_, reg_alpha, reg_beta, rootNode );
+         sTranspose_int<32,32,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       }
    } else {
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int_constStride1<1>( A_, B_, 0.0, 1.0, rootNode);
+         sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
       }else{
-         sTranspose_int_constStride1<0>( A_, B_, 0.0, 1.0, rootNode);
+         sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
       }
    }
 }
 
-void Transpose::execute() noexcept
+template<typename floatType>
+void Transpose<floatType>::execute() noexcept
 {
    if( masterPlan_ == nullptr ) {
-      printf("ERROR: plan has not yet been created.\n");
+      fprintf(stderr,"ERROR: master plan has not yet been created.\n");
       exit(-1);
    }
    
 #pragma omp parallel num_threads(numThreads_)
    if ( perm_[0] != 0 ) {
-      //broadcast reg_alpha
-      __m256 reg_alpha = _mm256_set1_ps(alpha_);
-      //broadcast reg_beta
-      __m256 reg_beta = _mm256_set1_ps(beta_);
-
       auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1>( A_, A_, B_, B_, reg_alpha, reg_beta, rootNode );
+         sTranspose_int<32,32,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
       } else {
-         sTranspose_int<32,32,0>( A_, A_, B_, B_, reg_alpha, reg_beta, rootNode );
+         sTranspose_int<32,32,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
       }
    } else {
       auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int_constStride1<1>( A_, B_, alpha_, beta_, rootNode);
+         sTranspose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
       } else {
-         sTranspose_int_constStride1<0>( A_, B_, alpha_, beta_, rootNode);
+         sTranspose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
       }
    }
 }
 
-int Transpose::getIncrement( int loopIdx ) const
+template<typename floatType>
+int Transpose<floatType>::getIncrement( int loopIdx ) const
 {
    int inc = 1;
    if( perm_[0] != 0 ) {
@@ -466,7 +519,8 @@ int Transpose::getIncrement( int loopIdx ) const
    return inc;
 }
 
-void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const
+template<typename floatType>
+void Transpose<floatType>::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const
 {
    numTasksPerLoop.resize(dim_);
    for(int loopIdx=0; loopIdx < dim_; ++loopIdx){
@@ -475,7 +529,8 @@ void Transpose::getAvailableParallelism( std::vector<int> &numTasksPerLoop ) con
    }
 }
 
-void Transpose::getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
+template<typename floatType>
+void Transpose<floatType>::getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
                                              std::vector<int> &availableParallelismAtLoop, 
                                              std::vector<int> &achievedParallelismAtLoop, 
                                              std::vector<std::vector<int> > &parallelismStrategies) const
@@ -506,7 +561,8 @@ void Transpose::getAllParallelismStrategies( std::list<int> &primeFactorsToMatch
    }
 }
 
-double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedParallelismAtLoop ) const
+template<typename floatType>
+double Transpose<floatType>::parallelismCostHeuristic( const std::vector<int> &achievedParallelismAtLoop ) const
 {
    std::vector<int> availableParallelismAtLoop;
    this->getAvailableParallelism( availableParallelismAtLoop);
@@ -532,13 +588,14 @@ double Transpose::parallelismCostHeuristic( const std::vector<int> &achievedPara
    
 
    const int workPerThread = (availableParallelismAtLoop[perm_[0]] + achievedParallelismAtLoop[perm_[0]] -1) / achievedParallelismAtLoop[perm_[0]];
-   if( workPerThread * sizeof(float) % 32 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
+   if( workPerThread * sizeof(floatType) % 32 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
       cost *= std::pow(1.00015, std::min(16,achievedParallelismAtLoop[perm_[0]] - 1)); // penalize this parallelization again
    }
    return cost;
 }
 
-void Transpose::getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const
+template<typename floatType>
+void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const
 {
    parallelismStrategies.clear();
    if( numThreads_ == 1 ){
@@ -585,10 +642,11 @@ void Transpose::getParallelismStrategies(std::vector<std::vector<int> > &paralle
       }
 }
 
-void Transpose::verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const
+template<typename floatType>
+void Transpose<floatType>::verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const
 {
    if ( dim < 2 ) {
-      printf("ERROR: dim invalid\n");
+      fprintf(stderr,"ERROR: dim invalid\n");
       exit(-1);
    }
 
@@ -597,7 +655,7 @@ void Transpose::verifyParameter(const int *size, const int* perm, const int* out
    for(int i=0;i < dim ; ++i)
    {
       if( size[i] <= 0 ) {
-         printf("ERROR: size invalid\n");
+         fprintf(stderr,"ERROR: size invalid\n");
          exit(-1);
       }
       found[ perm[i] ] = 1;
@@ -605,26 +663,27 @@ void Transpose::verifyParameter(const int *size, const int* perm, const int* out
 
    for(int i=0;i < dim ; ++i)
       if( found[i] <= 0 ) {
-         printf("ERROR: permutation invalid\n");
+         fprintf(stderr,"ERROR: permutation invalid\n");
          exit(-1);
       }
 
    if ( outerSizeA != NULL )
       for(int i=0;i < dim ; ++i)
          if ( outerSizeA[i] < size[i] ) {
-            printf("ERROR: outerSizeA invalid\n");
+            fprintf(stderr,"ERROR: outerSizeA invalid\n");
             exit(-1);
          }
 
    if ( outerSizeB != NULL )
       for(int i=0;i < dim ; ++i)
          if ( outerSizeB[i] < size[perm[i]] ) {
-            printf("ERROR: outerSizeB invalid\n");
+            fprintf(stderr,"ERROR: outerSizeB invalid\n");
             exit(-1);
          }
 }
 
-void Transpose::computeLeadingDimensions()
+template<typename floatType>
+void Transpose<floatType>::computeLeadingDimensions()
 {
    lda_[0] = 1;
    if( outerSizeA_[0] == -1 )
@@ -649,7 +708,8 @@ void Transpose::computeLeadingDimensions()
   *           perm=3,1,2,0 & size=10,11,12,13  becomes: perm=2,1,0 & size=10,11*12,13
   * \return This function will initialize sizeA_, perm_, outerSizeA_, outersize_ and dim_
 */
-void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim)
+template<typename floatType>
+void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim)
 {
    std::list< std::tuple<int, int> > fusedIndices;
 
@@ -675,7 +735,7 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
             && (outerSizeA == NULL || outerSizeA == nullptr || sizeA[perm[i]] == outerSizeA[perm[i]]) 
             && (outerSizeB == NULL || outerSizeB == nullptr || sizeA[perm[i]] == outerSizeB[i]) ){ 
 #ifdef DEBUG
-         printf("MERGING indices %d and %d\n",perm[i], perm[i+1]); 
+         fprintf(stderr,"MERGING indices %d and %d\n",perm[i], perm[i+1]); 
 #endif
          fusedIndices.push_back( std::make_tuple(perm_[dim_],perm[i+1]) );
          i++;
@@ -734,12 +794,13 @@ void Transpose::fuseIndices(const int *sizeA, const int* perm, const int *outerS
 #endif
    }
    if( dim_ < 2 || (dim_ == 2 && perm_[0] == 0) ){
-      printf("TODO: support dimension too small: map to copy()\n");
+      fprintf(stderr,"TODO: support dimension too small: map to copy()\n");
       exit(-1);
    }
 }
 
-double Transpose::loopCostHeuristic( const std::vector<int> &loopOrder ) const
+template<typename floatType>
+double Transpose<floatType>::loopCostHeuristic( const std::vector<int> &loopOrder ) const
 {
    // penalize different loop-oders differently
    double loopPenalty[dim_];
@@ -765,7 +826,8 @@ double Transpose::loopCostHeuristic( const std::vector<int> &loopOrder ) const
    return loopCost;
 }
 
-void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
+template<typename floatType>
+void Transpose<floatType>::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
 //   std::vector<int> loopOrder1 { 5, 3, 4, 1, 0, 2 };
 //   loopOrders.push_back(loopOrder1 );
@@ -798,8 +860,10 @@ void Transpose::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
       }
 }
 
-void Transpose::createPlan()
+template<typename floatType>
+void Transpose<floatType>::createPlan()
 {
+//   printf("entering createPlan()\n");
    std::vector<Plan*> allPlans;
    createPlans(allPlans);
 
@@ -815,7 +879,8 @@ void Transpose::createPlan()
    }
 }
 
-void Transpose::createPlans( std::vector<Plan*> &plans ) const
+template<typename floatType>
+void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 {
    std::vector<std::vector<int> > parallelismStrategies;
    this->getParallelismStrategies(parallelismStrategies);
@@ -892,9 +957,10 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
          plans.push_back(plan);
       }
    }
+//   printf("#plans: %d\n", plans.size());
    if( plans.size() != parallelismStrategies.size() * loopOrders.size() )
    {
-      printf("Internal error: number of plans does not fit\n");
+      fprintf(stderr,"Internal error: number of plans does not fit\n");
       exit(-1);
    }
 }
@@ -902,7 +968,8 @@ void Transpose::createPlans( std::vector<Plan*> &plans ) const
 /**
  * Estimates the time in seconds for the given computeTree
  */
-float Transpose::estimateExecutionTime( const Plan *plan)
+template<typename floatType>
+float Transpose<floatType>::estimateExecutionTime( const Plan *plan)
 {
    double startTime = omp_get_wtime();
    this->executeEstimate(plan);
@@ -926,7 +993,8 @@ float Transpose::estimateExecutionTime( const Plan *plan)
    return elapsedTime; 
 }
 
-double Transpose::getTimeLimit() const
+template<typename floatType>
+double Transpose<floatType>::getTimeLimit() const
 {
    if( selectionMethod_ == ESTIMATE )
       return 0.0;
@@ -937,16 +1005,17 @@ double Transpose::getTimeLimit() const
    else if( selectionMethod_ == CRAZY )
       return 3600.; // 1h
    else{
-      printf("ERROR: sectionMethod unknown.\n");
+      fprintf(stderr,"ERROR: sectionMethod unknown.\n");
       exit(-1);
    }
    return -1;
 }
 
-Plan* Transpose::selectPlan( const std::vector<Plan*> &plans)
+template<typename floatType>
+Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
 {
    if( plans.size() <= 0 ){
-      printf("Internal error: not enough plans generated.\n");
+      fprintf(stderr,"Internal error: not enough plans generated.\n");
       exit(-1);
    }
 
@@ -986,6 +1055,9 @@ Plan* Transpose::selectPlan( const std::vector<Plan*> &plans)
    }
    return plans[bestPlan_id];
 }
+
+template class Transpose<float>;
+//template class Transpose<double>;
 
 }
 
