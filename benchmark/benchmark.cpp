@@ -16,15 +16,20 @@
 
 #include <hptc/hptc.h>
 
-#include <ttc_c.h>
+
+//typedef float floatType;
+typedef double floatType;
 
 //#define ORIG_TTC
 //#define RELEASE_HPTT
+#ifdef ORIG_TTC
+#include <ttc_c.h>
+#endif
 
-int equal_(const float *A, const float*B, int total_size){
+int equal_(const floatType *A, const floatType*B, int total_size){
   int error = 0;
-   const float *Atmp= A;
-   const float *Btmp= B;
+   const floatType *Atmp= A;
+   const floatType *Btmp= B;
    for(int i=0;i < total_size ; ++i){
       if( Atmp[i] != Atmp[i] || Btmp[i] != Btmp[i]  || isinf(Atmp[i]) || isinf(Btmp[i]) ){
          error += 1; //test for NaN or Inf
@@ -38,7 +43,7 @@ int equal_(const float *A, const float*B, int total_size){
       if(diff > 0){
          double relError = (diff / max);
          if(relError > 4e-5){
-//            printf("%.3e %.3e\n",relError, max);
+            printf("%.3e  %.3e %.3e\n",relError, Atmp[i], Btmp[i]);
             error += 1;
          }
       }
@@ -46,13 +51,13 @@ int equal_(const float *A, const float*B, int total_size){
    return (error == 0) ? 1 : 0;
 }
 
-void restore(const float* A, float* B, size_t n)
+void restore(const floatType* A, floatType* B, size_t n)
 {
    for(size_t i=0;i < n ; ++i)
       B[i] = A[i];
 }
 
-void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const float* __restrict__ A, float alpha, float* __restrict__ B, float beta)
+void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __restrict__ A, floatType alpha, floatType* __restrict__ B, floatType beta)
 {
    // compute stride for all dimensions w.r.t. A
    uint32_t strideA[dim];
@@ -84,8 +89,8 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const float* __rest
          offsetA += current_index * strideA[perm[i]];
       }
 
-      const float* __restrict__ A_ = A + offsetA;
-      float* __restrict__ B_ = B + j*sizeInner;
+      const floatType* __restrict__ A_ = A + offsetA;
+      floatType* __restrict__ B_ = B + j*sizeInner;
 
       uint32_t strideAinner = strideA[perm[0]];
 
@@ -100,9 +105,9 @@ int main(int argc, char *argv[])
   if( getenv("OMP_NUM_THREADS") != NULL )
      numThreads = atoi(getenv("OMP_NUM_THREADS"));
   printf("numThreads: %d\n",numThreads);
-  float alpha = 2.2;
-  float beta = 4.1;
-  beta = 0; //TODO
+  floatType alpha = 2.2;
+  floatType beta = 4.1;
+  //beta = 0; 
 
   if( argc < 2 ){
      printf("Usage: <dim> <permutation each index separated by ' '> <size of each index separated by ' '>\n");
@@ -132,16 +137,16 @@ int main(int argc, char *argv[])
 
   // Allocating memory for tensors
   int largerThanL3 = 1024*1024*100/sizeof(double);
-  float *A, *B, *B_ref, *B_orig, *B_proto, *B_hptt;
+  floatType *A, *B, *B_ref, *B_orig, *B_proto, *B_hptt;
   double *trash1, *trash2;
-  int ret = posix_memalign((void**) &trash1, 32, sizeof(double) * largerThanL3);
-  ret += posix_memalign((void**) &trash2, 32, sizeof(double) * largerThanL3);
-  ret += posix_memalign((void**) &B, 32, sizeof(float) * total_size);
-  ret += posix_memalign((void**) &A, 32, sizeof(float) * total_size);
-  ret += posix_memalign((void**) &B_ref, 32, sizeof(float) * total_size);
-  ret += posix_memalign((void**) &B_orig, 32, sizeof(float) * total_size);
-  ret += posix_memalign((void**) &B_proto, 32, sizeof(float) * total_size);
-  ret += posix_memalign((void**) &B_hptt, 32, sizeof(float) * total_size);
+  int ret = posix_memalign((void**) &trash1, 64, sizeof(double) * largerThanL3);
+  ret += posix_memalign((void**) &trash2, 64, sizeof(double) * largerThanL3);
+  ret += posix_memalign((void**) &B, 64, sizeof(floatType) * total_size);
+  ret += posix_memalign((void**) &A, 64, sizeof(floatType) * total_size);
+  ret += posix_memalign((void**) &B_ref, 64, sizeof(floatType) * total_size);
+  ret += posix_memalign((void**) &B_orig, 64, sizeof(floatType) * total_size);
+  ret += posix_memalign((void**) &B_proto, 64, sizeof(floatType) * total_size);
+  ret += posix_memalign((void**) &B_hptt, 64, sizeof(floatType) * total_size);
   if( ret ){
      printf("ALLOC ERROR\n");
      exit(-1);
@@ -188,7 +193,7 @@ int main(int argc, char *argv[])
         auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     printf("HPTT (proto) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
+     printf("HPTT (proto) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
   }
 
   { // reference
@@ -201,7 +206,7 @@ int main(int argc, char *argv[])
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     printf("TTC (ref) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
+     printf("TTC (ref) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
   }
 
   // Verification
@@ -233,7 +238,7 @@ int main(int argc, char *argv[])
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     printf("TTC (orig) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
+     printf("TTC (orig) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
      //verify
      if( !equal_(B_orig, B_ref, total_size) )
         fprintf(stderr, "error in reference\n");
@@ -249,11 +254,11 @@ int main(int argc, char *argv[])
      for(int i=0;i < dim; ++i)
         size_.push_back(size[i]);
 
-     hptc::DeducedFloatType<float> alpha_ = alpha;
-     hptc::DeducedFloatType<float> beta_ = beta;
+     hptc::DeducedFloatType<floatType> alpha_ = alpha;
+     hptc::DeducedFloatType<floatType> beta_ = beta;
      double timeout = 10;
      double minTime = 1e200;
-     auto plan = hptc::create_trans_plan<float>(A, B_hptt,
+     auto plan = hptc::create_trans_plan<floatType>(A, B_hptt,
             size_, perm_,
             alpha_, beta_, 
             numThreads, timeout);
@@ -269,7 +274,7 @@ int main(int argc, char *argv[])
         auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
-     printf("HPTT (release) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
+     printf("HPTT (release) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
      // verify 
      if( !equal_(B_ref, B_hptt, total_size) )
         fprintf(stderr, "error in ttc_hptt\n");

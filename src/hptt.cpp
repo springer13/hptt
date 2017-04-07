@@ -32,171 +32,189 @@ static INLINE void prefetch(const floatType* A, const int lda)
       _mm_prefetch((char*)(A + i * lda), _MM_HINT_T2);
 }
 
-//template<typename floatType, typename regType, int betaIsZero>
-//static INLINE void micro_kernel(const floatType* __restrict__ A, const size_t lda, floatType* __restrict__ B, const size_t ldb, const regType &reg_alpha ,const regType &reg_beta);
-//
-//template<int betaIsZero>
-//static INLINE void micro_kernel<double, __m256d, betaIsZero>(const double* __restrict__ A, const size_t lda, double* __restrict__ B, const size_t ldb, const __m256d &reg_alpha ,const __m256d &reg_beta)
-//{
-//   //Load A
-//   __m256d rowA0 = _mm256_load_pd((A + 0 +0*lda));
-//   __m256d rowA1 = _mm256_load_pd((A + 0 +1*lda));
-//   __m256d rowA2 = _mm256_load_pd((A + 0 +2*lda));
-//   __m256d rowA3 = _mm256_load_pd((A + 0 +3*lda));
-//
-//   //4x4 transpose micro kernel
-//   __m256d r4, r34, r3, r33;
-//   r33 = _mm256_shuffle_pd( rowA2, rowA3, 0x3 );
-//    r3 = _mm256_shuffle_pd( rowA0, rowA1, 0x3 );
-//   r34 = _mm256_shuffle_pd( rowA2, rowA3, 0xc );
-//    r4 = _mm256_shuffle_pd( rowA0, rowA1, 0xc );
-//   rowA0 = _mm256_permute2f128_pd( r34, r4, 0x2 );
-//   rowA1 = _mm256_permute2f128_pd( r33, r3, 0x2 );
-//   rowA2 = _mm256_permute2f128_pd( r33, r3, 0x13 );
-//   rowA3 = _mm256_permute2f128_pd( r34, r4, 0x13 );
-//
-//   //Scale A
-//   rowA0 = _mm256_mul_pd(rowA0, reg_alpha);
-//   rowA1 = _mm256_mul_pd(rowA1, reg_alpha);
-//   rowA2 = _mm256_mul_pd(rowA2, reg_alpha);
-//   rowA3 = _mm256_mul_pd(rowA3, reg_alpha);
-//
-//   //Load B
-//   if( !betaIsZero )
-//   {
-//      __m256d rowB0 = _mm256_load_pd((B + 0 +0*ldb));
-//      __m256d rowB1 = _mm256_load_pd((B + 0 +1*ldb));
-//      __m256d rowB2 = _mm256_load_pd((B + 0 +2*ldb));
-//      __m256d rowB3 = _mm256_load_pd((B + 0 +3*ldb));
-//
-//      rowB0 = _mm256_add_pd( _mm256_mul_pd(rowB0, reg_beta), rowA0);
-//      rowB1 = _mm256_add_pd( _mm256_mul_pd(rowB1, reg_beta), rowA1);
-//      rowB2 = _mm256_add_pd( _mm256_mul_pd(rowB2, reg_beta), rowA2);
-//      rowB3 = _mm256_add_pd( _mm256_mul_pd(rowB3, reg_beta), rowA3);
-//      //Store B
-//      _mm256_store_pd((B + 0 + 0 * ldb), rowB0);
-//      _mm256_store_pd((B + 0 + 1 * ldb), rowB1);
-//      _mm256_store_pd((B + 0 + 2 * ldb), rowB2);
-//      _mm256_store_pd((B + 0 + 3 * ldb), rowB3);
-//   } else {
-//      //Store B
-//      _mm256_store_pd((B + 0 + 0 * ldb), rowA0);
-//      _mm256_store_pd((B + 0 + 1 * ldb), rowA1);
-//      _mm256_store_pd((B + 0 + 2 * ldb), rowA2);
-//      _mm256_store_pd((B + 0 + 3 * ldb), rowA3);
-//   }
-//}
 
-//B_ji = alpha * A_ij + beta * B_ji
-template<typename floatType, int betaIsZero>
-static INLINE void micro_kernel(const floatType* __restrict__ A, const size_t lda, floatType* __restrict__ B, const size_t ldb  ,const __m256 &reg_alpha ,const __m256 &reg_beta)
+template <typename floatType, int betaIsZero>
+struct micro_kernel{};
+
+template <int betaIsZero>
+struct micro_kernel<double, betaIsZero>
 {
-   //Load A
-   __m256 rowA0 = _mm256_load_ps((A + 0 +0*lda));
-   __m256 rowA1 = _mm256_load_ps((A + 0 +1*lda));
-   __m256 rowA2 = _mm256_load_ps((A + 0 +2*lda));
-   __m256 rowA3 = _mm256_load_ps((A + 0 +3*lda));
-   __m256 rowA4 = _mm256_load_ps((A + 0 +4*lda));
-   __m256 rowA5 = _mm256_load_ps((A + 0 +5*lda));
-   __m256 rowA6 = _mm256_load_ps((A + 0 +6*lda));
-   __m256 rowA7 = _mm256_load_ps((A + 0 +7*lda));
+    static void execute(const double* __restrict__ A, const size_t lda, double* __restrict__ B, const size_t ldb, const double alpha ,const double beta)
+    {
+       __m256d reg_alpha = _mm256_set1_pd(alpha); // do not alter the content of B
+       __m256d reg_beta = _mm256_set1_pd(beta); // do not alter the content of B
+       //Load A
+       __m256d rowA0 = _mm256_load_pd((A + 0 +0*lda));
+       __m256d rowA1 = _mm256_load_pd((A + 0 +1*lda));
+       __m256d rowA2 = _mm256_load_pd((A + 0 +2*lda));
+       __m256d rowA3 = _mm256_load_pd((A + 0 +3*lda));
 
-   //8x8 transpose micro kernel
-   __m256 r121, r139, r120, r138, r71, r89, r70, r88, r11, r1, r55, r29, r10, r0, r54, r28;
-   r28 = _mm256_unpacklo_ps( rowA4, rowA5 );
-   r54 = _mm256_unpacklo_ps( rowA6, rowA7 );
-    r0 = _mm256_unpacklo_ps( rowA0, rowA1 );
-   r10 = _mm256_unpacklo_ps( rowA2, rowA3 );
-   r29 = _mm256_unpackhi_ps( rowA4, rowA5 );
-   r55 = _mm256_unpackhi_ps( rowA6, rowA7 );
-    r1 = _mm256_unpackhi_ps( rowA0, rowA1 );
-   r11 = _mm256_unpackhi_ps( rowA2, rowA3 );
-   r88 = _mm256_shuffle_ps( r28, r54, 0x44 );
-   r70 = _mm256_shuffle_ps( r0, r10, 0x44 );
-   r89 = _mm256_shuffle_ps( r28, r54, 0xee );
-   r71 = _mm256_shuffle_ps( r0, r10, 0xee );
-   r138 = _mm256_shuffle_ps( r29, r55, 0x44 );
-   r120 = _mm256_shuffle_ps( r1, r11, 0x44 );
-   r139 = _mm256_shuffle_ps( r29, r55, 0xee );
-   r121 = _mm256_shuffle_ps( r1, r11, 0xee );
-   rowA0 = _mm256_permute2f128_ps( r88, r70, 0x2 );
-   rowA1 = _mm256_permute2f128_ps( r89, r71, 0x2 );
-   rowA2 = _mm256_permute2f128_ps( r138, r120, 0x2 );
-   rowA3 = _mm256_permute2f128_ps( r139, r121, 0x2 );
-   rowA4 = _mm256_permute2f128_ps( r88, r70, 0x13 );
-   rowA5 = _mm256_permute2f128_ps( r89, r71, 0x13 );
-   rowA6 = _mm256_permute2f128_ps( r138, r120, 0x13 );
-   rowA7 = _mm256_permute2f128_ps( r139, r121, 0x13 );
+       //4x4 transpose micro kernel
+       __m256d r4, r34, r3, r33;
+       r33 = _mm256_shuffle_pd( rowA2, rowA3, 0x3 );
+       r3 = _mm256_shuffle_pd( rowA0, rowA1, 0x3 );
+       r34 = _mm256_shuffle_pd( rowA2, rowA3, 0xc );
+       r4 = _mm256_shuffle_pd( rowA0, rowA1, 0xc );
+       rowA0 = _mm256_permute2f128_pd( r34, r4, 0x2 );
+       rowA1 = _mm256_permute2f128_pd( r33, r3, 0x2 );
+       rowA2 = _mm256_permute2f128_pd( r33, r3, 0x13 );
+       rowA3 = _mm256_permute2f128_pd( r34, r4, 0x13 );
 
-   //Scale A
-   rowA0 = _mm256_mul_ps(rowA0, reg_alpha);
-   rowA1 = _mm256_mul_ps(rowA1, reg_alpha);
-   rowA2 = _mm256_mul_ps(rowA2, reg_alpha);
-   rowA3 = _mm256_mul_ps(rowA3, reg_alpha);
-   rowA4 = _mm256_mul_ps(rowA4, reg_alpha);
-   rowA5 = _mm256_mul_ps(rowA5, reg_alpha);
-   rowA6 = _mm256_mul_ps(rowA6, reg_alpha);
-   rowA7 = _mm256_mul_ps(rowA7, reg_alpha);
+       //Scale A
+       rowA0 = _mm256_mul_pd(rowA0, reg_alpha);
+       rowA1 = _mm256_mul_pd(rowA1, reg_alpha);
+       rowA2 = _mm256_mul_pd(rowA2, reg_alpha);
+       rowA3 = _mm256_mul_pd(rowA3, reg_alpha);
 
-   //Load B
-   if( !betaIsZero )
-   {
-      __m256 rowB0 = _mm256_load_ps((B + 0 +0*ldb));
-      __m256 rowB1 = _mm256_load_ps((B + 0 +1*ldb));
-      __m256 rowB2 = _mm256_load_ps((B + 0 +2*ldb));
-      __m256 rowB3 = _mm256_load_ps((B + 0 +3*ldb));
-      __m256 rowB4 = _mm256_load_ps((B + 0 +4*ldb));
-      __m256 rowB5 = _mm256_load_ps((B + 0 +5*ldb));
-      __m256 rowB6 = _mm256_load_ps((B + 0 +6*ldb));
-      __m256 rowB7 = _mm256_load_ps((B + 0 +7*ldb));
+       //Load B
+       if( !betaIsZero )
+       {
+          __m256d rowB0 = _mm256_load_pd((B + 0 +0*ldb));
+          __m256d rowB1 = _mm256_load_pd((B + 0 +1*ldb));
+          __m256d rowB2 = _mm256_load_pd((B + 0 +2*ldb));
+          __m256d rowB3 = _mm256_load_pd((B + 0 +3*ldb));
 
-      rowB0 = _mm256_add_ps( _mm256_mul_ps(rowB0, reg_beta), rowA0);
-      rowB1 = _mm256_add_ps( _mm256_mul_ps(rowB1, reg_beta), rowA1);
-      rowB2 = _mm256_add_ps( _mm256_mul_ps(rowB2, reg_beta), rowA2);
-      rowB3 = _mm256_add_ps( _mm256_mul_ps(rowB3, reg_beta), rowA3);
-      rowB4 = _mm256_add_ps( _mm256_mul_ps(rowB4, reg_beta), rowA4);
-      rowB5 = _mm256_add_ps( _mm256_mul_ps(rowB5, reg_beta), rowA5);
-      rowB6 = _mm256_add_ps( _mm256_mul_ps(rowB6, reg_beta), rowA6);
-      rowB7 = _mm256_add_ps( _mm256_mul_ps(rowB7, reg_beta), rowA7);
-      //Store B
-      _mm256_store_ps((B + 0 + 0 * ldb), rowB0);
-      _mm256_store_ps((B + 0 + 1 * ldb), rowB1);
-      _mm256_store_ps((B + 0 + 2 * ldb), rowB2);
-      _mm256_store_ps((B + 0 + 3 * ldb), rowB3);
-      _mm256_store_ps((B + 0 + 4 * ldb), rowB4);
-      _mm256_store_ps((B + 0 + 5 * ldb), rowB5);
-      _mm256_store_ps((B + 0 + 6 * ldb), rowB6);
-      _mm256_store_ps((B + 0 + 7 * ldb), rowB7);
-   } else {
-      _mm256_store_ps((B + 0 + 0 * ldb), rowA0);
-      _mm256_store_ps((B + 0 + 1 * ldb), rowA1);
-      _mm256_store_ps((B + 0 + 2 * ldb), rowA2);
-      _mm256_store_ps((B + 0 + 3 * ldb), rowA3);
-      _mm256_store_ps((B + 0 + 4 * ldb), rowA4);
-      _mm256_store_ps((B + 0 + 5 * ldb), rowA5);
-      _mm256_store_ps((B + 0 + 6 * ldb), rowA6);
-      _mm256_store_ps((B + 0 + 7 * ldb), rowA7);
-   }
+          rowB0 = _mm256_add_pd( _mm256_mul_pd(rowB0, reg_beta), rowA0);
+          rowB1 = _mm256_add_pd( _mm256_mul_pd(rowB1, reg_beta), rowA1);
+          rowB2 = _mm256_add_pd( _mm256_mul_pd(rowB2, reg_beta), rowA2);
+          rowB3 = _mm256_add_pd( _mm256_mul_pd(rowB3, reg_beta), rowA3);
+          //Store B
+          _mm256_store_pd((B + 0 + 0 * ldb), rowB0);
+          _mm256_store_pd((B + 0 + 1 * ldb), rowB1);
+          _mm256_store_pd((B + 0 + 2 * ldb), rowB2);
+          _mm256_store_pd((B + 0 + 3 * ldb), rowB3);
+       } else {
+          //Store B
+          _mm256_store_pd((B + 0 + 0 * ldb), rowA0);
+          _mm256_store_pd((B + 0 + 1 * ldb), rowA1);
+          _mm256_store_pd((B + 0 + 2 * ldb), rowA2);
+          _mm256_store_pd((B + 0 + 3 * ldb), rowA3);
+       }
+    }
+};
+
+template <int betaIsZero>
+struct micro_kernel<float, betaIsZero>
+{
+    static void execute(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb, const float alpha ,const float beta)
+    {
+       __m256 reg_alpha = _mm256_set1_ps(alpha); // do not alter the content of B
+       __m256 reg_beta = _mm256_set1_ps(beta); // do not alter the content of B
+       //Load A
+       __m256 rowA0 = _mm256_load_ps((A +0*lda));
+       __m256 rowA1 = _mm256_load_ps((A +1*lda));
+       __m256 rowA2 = _mm256_load_ps((A +2*lda));
+       __m256 rowA3 = _mm256_load_ps((A +3*lda));
+       __m256 rowA4 = _mm256_load_ps((A +4*lda));
+       __m256 rowA5 = _mm256_load_ps((A +5*lda));
+       __m256 rowA6 = _mm256_load_ps((A +6*lda));
+       __m256 rowA7 = _mm256_load_ps((A +7*lda));
+
+       //8x8 transpose micro kernel
+       __m256 r121, r139, r120, r138, r71, r89, r70, r88, r11, r1, r55, r29, r10, r0, r54, r28;
+       r28 = _mm256_unpacklo_ps( rowA4, rowA5 );
+       r54 = _mm256_unpacklo_ps( rowA6, rowA7 );
+       r0 = _mm256_unpacklo_ps( rowA0, rowA1 );
+       r10 = _mm256_unpacklo_ps( rowA2, rowA3 );
+       r29 = _mm256_unpackhi_ps( rowA4, rowA5 );
+       r55 = _mm256_unpackhi_ps( rowA6, rowA7 );
+       r1 = _mm256_unpackhi_ps( rowA0, rowA1 );
+       r11 = _mm256_unpackhi_ps( rowA2, rowA3 );
+       r88 = _mm256_shuffle_ps( r28, r54, 0x44 );
+       r70 = _mm256_shuffle_ps( r0, r10, 0x44 );
+       r89 = _mm256_shuffle_ps( r28, r54, 0xee );
+       r71 = _mm256_shuffle_ps( r0, r10, 0xee );
+       r138 = _mm256_shuffle_ps( r29, r55, 0x44 );
+       r120 = _mm256_shuffle_ps( r1, r11, 0x44 );
+       r139 = _mm256_shuffle_ps( r29, r55, 0xee );
+       r121 = _mm256_shuffle_ps( r1, r11, 0xee );
+       rowA0 = _mm256_permute2f128_ps( r88, r70, 0x2 );
+       rowA1 = _mm256_permute2f128_ps( r89, r71, 0x2 );
+       rowA2 = _mm256_permute2f128_ps( r138, r120, 0x2 );
+       rowA3 = _mm256_permute2f128_ps( r139, r121, 0x2 );
+       rowA4 = _mm256_permute2f128_ps( r88, r70, 0x13 );
+       rowA5 = _mm256_permute2f128_ps( r89, r71, 0x13 );
+       rowA6 = _mm256_permute2f128_ps( r138, r120, 0x13 );
+       rowA7 = _mm256_permute2f128_ps( r139, r121, 0x13 );
+
+       //Scale A
+       rowA0 = _mm256_mul_ps(rowA0, reg_alpha);
+       rowA1 = _mm256_mul_ps(rowA1, reg_alpha);
+       rowA2 = _mm256_mul_ps(rowA2, reg_alpha);
+       rowA3 = _mm256_mul_ps(rowA3, reg_alpha);
+       rowA4 = _mm256_mul_ps(rowA4, reg_alpha);
+       rowA5 = _mm256_mul_ps(rowA5, reg_alpha);
+       rowA6 = _mm256_mul_ps(rowA6, reg_alpha);
+       rowA7 = _mm256_mul_ps(rowA7, reg_alpha);
+
+       //Load B
+       if( !betaIsZero )
+       {
+          __m256 rowB0 = _mm256_load_ps((B +0*ldb));
+          __m256 rowB1 = _mm256_load_ps((B +1*ldb));
+          __m256 rowB2 = _mm256_load_ps((B +2*ldb));
+          __m256 rowB3 = _mm256_load_ps((B +3*ldb));
+          __m256 rowB4 = _mm256_load_ps((B +4*ldb));
+          __m256 rowB5 = _mm256_load_ps((B +5*ldb));
+          __m256 rowB6 = _mm256_load_ps((B +6*ldb));
+          __m256 rowB7 = _mm256_load_ps((B +7*ldb));
+
+          rowB0 = _mm256_add_ps( _mm256_mul_ps(rowB0, reg_beta), rowA0);
+          rowB1 = _mm256_add_ps( _mm256_mul_ps(rowB1, reg_beta), rowA1);
+          rowB2 = _mm256_add_ps( _mm256_mul_ps(rowB2, reg_beta), rowA2);
+          rowB3 = _mm256_add_ps( _mm256_mul_ps(rowB3, reg_beta), rowA3);
+          rowB4 = _mm256_add_ps( _mm256_mul_ps(rowB4, reg_beta), rowA4);
+          rowB5 = _mm256_add_ps( _mm256_mul_ps(rowB5, reg_beta), rowA5);
+          rowB6 = _mm256_add_ps( _mm256_mul_ps(rowB6, reg_beta), rowA6);
+          rowB7 = _mm256_add_ps( _mm256_mul_ps(rowB7, reg_beta), rowA7);
+          //Store B
+          _mm256_store_ps((B + 0 * ldb), rowB0);
+          _mm256_store_ps((B + 1 * ldb), rowB1);
+          _mm256_store_ps((B + 2 * ldb), rowB2);
+          _mm256_store_ps((B + 3 * ldb), rowB3);
+          _mm256_store_ps((B + 4 * ldb), rowB4);
+          _mm256_store_ps((B + 5 * ldb), rowB5);
+          _mm256_store_ps((B + 6 * ldb), rowB6);
+          _mm256_store_ps((B + 7 * ldb), rowB7);
+       } else {
+          _mm256_store_ps((B + 0 * ldb), rowA0);
+          _mm256_store_ps((B + 1 * ldb), rowA1);
+          _mm256_store_ps((B + 2 * ldb), rowA2);
+          _mm256_store_ps((B + 3 * ldb), rowA3);
+          _mm256_store_ps((B + 4 * ldb), rowA4);
+          _mm256_store_ps((B + 5 * ldb), rowA5);
+          _mm256_store_ps((B + 6 * ldb), rowA6);
+          _mm256_store_ps((B + 7 * ldb), rowA7);
+       }
+    }
+};
+
+
+template<typename floatType>
+static void streamingStore( floatType* out, const floatType *in );
+
+template<>
+void streamingStore<float>( float* out, const float*in ){
+   _mm256_stream_ps(out, _mm256_load_ps(in));
+}
+template<>
+void streamingStore<double>( double* out, const double*in ){
+   _mm256_stream_pd(out, _mm256_load_pd(in));
 }
 
 template<int blockingA, int blockingB, int betaIsZero, typename floatType>
-static INLINE void macro_kernel(const float* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
+static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
                                    floatType* __restrict__ B, const floatType* __restrict__ Bnext, const size_t ldb,
                                    const floatType alpha ,const floatType beta)
 {
    constexpr int blocking_ = 128 / sizeof(floatType);
    constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
 
-   //broadcast reg_alpha
-   __m256 reg_alpha = _mm256_set1_ps(alpha); // do not alter the content of B
-   //broadcast reg_beta
-   __m256 reg_beta = _mm256_set1_ps(beta); // do not alter the content of B
-
-   bool useStreamingStores = betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0;
+   bool useStreamingStores = betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0 && (ldb*sizeof(floatType))%32 == 0;
 
    floatType *Btmp = B;
    size_t ldb_tmp = ldb;
-   floatType buffer[blockingA * blockingB] __attribute__((aligned(64)));
+   floatType buffer[blockingA * blockingB];// __attribute__((aligned(64)));
    if( useStreamingStores ){
       Btmp = buffer;
       ldb_tmp = blockingB;
@@ -207,156 +225,156 @@ static INLINE void macro_kernel(const float* __restrict__ A, const floatType* __
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
    }else if( blockingA == 2*blocking_micro_ && blockingB == blocking_ ) {
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
    }else if( blockingA == blocking_ && blockingB == 2*blocking_micro_) {
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
       if( !useStreamingStores )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
-      micro_kernel<floatType,betaIsZero>(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , reg_alpha , reg_beta);
-      micro_kernel<floatType,betaIsZero>(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , reg_alpha , reg_beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
+      micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
    } else {
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 0 )
-         micro_kernel<floatType,betaIsZero>(A, lda, Btmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A, lda, Btmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ * lda, lda, Btmp + blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + blocking_micro_ * lda, lda, Btmp + blocking_micro_, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 2*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 0 && blockingB > 3*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > blocking_micro_ && blockingB > 0 )
-         micro_kernel<floatType,betaIsZero>(A + blocking_micro_, lda, Btmp + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + blocking_micro_, lda, Btmp + blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > blocking_micro_ && blockingB > blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > blocking_micro_ && blockingB > 2*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > blocking_micro_ && blockingB > 3*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 2*blocking_micro_ && blockingB > 0 )
-         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_, lda, Btmp + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 2*blocking_micro_, lda, Btmp + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 2*blocking_micro_ && blockingB > blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 2*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 2*blocking_micro_ && blockingB > 2*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 2*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 2*blocking_micro_ && blockingB > 3*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 2*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 2*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 2*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 3*blocking_micro_ && blockingB > 0 )
-         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_, lda, Btmp + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 3*blocking_micro_, lda, Btmp + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 3*blocking_micro_ && blockingB > blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 3*blocking_micro_ + blocking_micro_ * lda, lda, Btmp + blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 3*blocking_micro_ && blockingB > 2*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 3*blocking_micro_ + 2*blocking_micro_ * lda, lda, Btmp + 2*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
 
       //invoke micro-transpose
       if(blockingA > 3*blocking_micro_ && blockingB > 3*blocking_micro_ )
-         micro_kernel<floatType,betaIsZero>(A + 3*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , reg_alpha , reg_beta);
+         micro_kernel<floatType,betaIsZero>::execute(A + 3*blocking_micro_ + 3*blocking_micro_ * lda, lda, Btmp + 3*blocking_micro_ + 3*blocking_micro_ * ldb_tmp, ldb_tmp  , alpha , beta);
    }
 
    // write buffer to main-memory via non-temporal stores
    if( useStreamingStores )
       for( int i = 0; i < blockingA; i++){
          for( int j = 0; j < blockingB; j+=blocking_micro_)
-            _mm256_stream_ps((B + i * ldb + j), _mm256_load_ps((buffer + i * ldb_tmp + j)));
+            streamingStore<floatType>(B + i * ldb + j, buffer + i * ldb_tmp + j);
       }
 }
 
@@ -465,9 +483,9 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
    if ( perm_[0] != 0 ) {
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+         sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       } else {
-         sTranspose_int<32,32,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+         sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       }
    } else {
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
@@ -491,9 +509,9 @@ void Transpose<floatType>::execute() noexcept
    if ( perm_[0] != 0 ) {
       auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
       if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<32,32,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+         sTranspose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
       } else {
-         sTranspose_int<32,32,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+         sTranspose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
       }
    } else {
       auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
@@ -588,7 +606,7 @@ double Transpose<floatType>::parallelismCostHeuristic( const std::vector<int> &a
    
 
    const int workPerThread = (availableParallelismAtLoop[perm_[0]] + achievedParallelismAtLoop[perm_[0]] -1) / achievedParallelismAtLoop[perm_[0]];
-   if( workPerThread * sizeof(floatType) % 32 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
+   if( workPerThread * sizeof(floatType) % 64 != 0 && achievedParallelismAtLoop[perm_[0]] > 1 ){ //avoid false-sharing
       cost *= std::pow(1.00015, std::min(16,achievedParallelismAtLoop[perm_[0]] - 1)); // penalize this parallelization again
    }
    return cost;
@@ -1057,7 +1075,7 @@ Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
 }
 
 template class Transpose<float>;
-//template class Transpose<double>;
+template class Transpose<double>;
 
 }
 

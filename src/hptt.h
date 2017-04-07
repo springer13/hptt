@@ -205,24 +205,25 @@ auto create_plan(const int *sizeA,
    return plan;
 }
 
-//auto create_plan(const int *sizeA, 
-//                 const int *perm, 
-//                 const int *outerSizeA, 
-//                 const int *outerSizeB, 
-//                 const int dim,
-//                 const double *A,
-//                 const double alpha,
-//                 double *B,
-//                 const double beta,
-//                 const SelectionMethod selectionMethod,
-//                 const int numThreads )
-//{
-//   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
-//   plan->createPlan();
-//   return plan;
-//}
+auto create_plan(const int *sizeA, 
+                 const int *perm, 
+                 const int *outerSizeA, 
+                 const int *outerSizeB, 
+                 const int dim,
+                 const double *A,
+                 const double alpha,
+                 double *B,
+                 const double beta,
+                 const SelectionMethod selectionMethod,
+                 const int numThreads )
+{
+   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   plan->createPlan();
+   return plan;
+}
 
 extern template class Transpose<float>;
+extern template class Transpose<double>;
 }
 
 #endif
