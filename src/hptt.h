@@ -88,7 +88,6 @@ class Transpose{
          numThreads_(numThreads), 
          masterPlan_(nullptr),
          blocking_constStride1_(1), //TODO
-         infoLevel_(0),
          selectionMethod_(selectionMethod)
       {
          sizeA_.resize(dim);
@@ -127,8 +126,6 @@ class Transpose{
       floatType getBeta() const noexcept { return beta_; }
       void setAlpha(floatType alpha) noexcept { alpha_ = alpha; }
       void setBeta(floatType beta) noexcept { beta_ = beta; }
-      void setInfoLevel(int infoLevel) noexcept { infoLevel_ = infoLevel; }
-      int getInfoLevel() noexcept { return infoLevel_; }
 
       /***************************************************
        * Public Methods
@@ -183,7 +180,7 @@ class Transpose{
       static constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      int infoLevel_; // determines which auxiliary messages should be printed
+      static constexpr int infoLevel_ = 0; // determines which auxiliary messages should be printed
 };
 
 void trashCache(double *A, double *B, int n);

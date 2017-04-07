@@ -16,6 +16,8 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
+//#define HPTT_TIMERS
+
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
 #elif defined(__GNUC__) || defined(__GNUG__)
@@ -410,13 +412,13 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
             sTranspose_int<blockingA, blocking_/2, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/2;
       }
-//      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
-//         if( lda_ == 1)
-//            sTranspose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
-//         else if( ldb_ == 1)
-//            sTranspose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
-//         i+=blocking_/4;
-//      }
+      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
+         if( lda_ == 1)
+            sTranspose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+         else if( ldb_ == 1)
+            sTranspose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+         i+=blocking_/4;
+      }
 
    } else {
       const size_t lda_macro_ = plan->next->lda;
@@ -437,13 +439,13 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
             macro_kernel<blockingA, blocking_/2, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          i+=blocking_/2;
       }
-//      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
-//         if( lda_ == 1)
-//            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
-//         else if( ldb_ == 1)
-//            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
-//         i+=blocking_/4;
-//      }
+      if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
+         if( lda_ == 1)
+            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+         else if( ldb_ == 1)
+            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+         i+=blocking_/4;
+      }
    }
 }
 
@@ -621,13 +623,13 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
       return;
    }
 
-   // ATTENTION: we don't care about the case where numThreads_ is a large prime number!!!
+   // ATTENTION: we don't care about the case where numThreads_ is a large prime number...
    // (sorry, KNC)
    //
    // we factorize numThreads into its prime factors because we have to match
    // every one to a certain loop. In principle every loop could be used to
    // match every primefactor, but some choices are preferable over others.
-   // E.g., we want to achive good load-balancing _and_ try to avoid the
+   // E.g., we want to achieve good load-balancing _and_ try to avoid the
    // stride-1 index of B (due to false sharing)
    std::list<int> primeFactors;
    getPrimeFactors( numThreads_, primeFactors );
@@ -820,7 +822,7 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
 template<typename floatType>
 double Transpose<floatType>::loopCostHeuristic( const std::vector<int> &loopOrder ) const
 {
-   // penalize different loop-oders differently
+   // penalize different loop-orders differently
    double loopPenalty[dim_];
    loopPenalty[dim_-1] = 0;
    double penalty = 10;
@@ -858,7 +860,7 @@ void Transpose<floatType>::getLoopOrders(std::vector<std::vector<int> > &loopOrd
    // create all loopOrders
    do {
       if ( perm_[0] == 0 && loopOrder[dim_-1] != 0 )
-         continue; // ATTENTION: we skipp all loop-orders where the stride-1 index is not the inner-most loop iff perm[0] == 0 (both for perf & correctness)
+         continue; // ATTENTION: we skip all loop-orders where the stride-1 index is not the inner-most loop iff perm[0] == 0 (both for perf & correctness)
 
       loopOrders.push_back(loopOrder);
    } while(std::next_permutation(loopOrder.begin(), loopOrder.end()));
@@ -882,10 +884,21 @@ template<typename floatType>
 void Transpose<floatType>::createPlan()
 {
 //   printf("entering createPlan()\n");
+#ifdef HPTT_TIMERS
+   double timeStart = omp_get_wtime();
+#endif
    std::vector<Plan*> allPlans;
    createPlans(allPlans);
 
+#ifdef HPTT_TIMERS
+   printf("createPlans() took %f ms\n",(omp_get_wtime()-timeStart)*1000);
+   timeStart = omp_get_wtime();
+#endif
    masterPlan_ = selectPlan( allPlans );
+#ifdef HPTT_TIMERS
+   printf("SelectPlan() took %f ms\n",(omp_get_wtime()-timeStart)*1000);
+   timeStart = omp_get_wtime();
+#endif
    
    //delete all other plans
    for( int i=0; i < allPlans.size(); i++ ){
@@ -895,92 +908,102 @@ void Transpose<floatType>::createPlan()
          allPlans[i] = nullptr;
       }
    }
+#ifdef HPTT_TIMERS
+   printf("Deleting plans took %f ms\n",(omp_get_wtime()-timeStart)*1000);
+#endif
 }
 
 template<typename floatType>
 void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 {
+#ifdef HPTT_TIMERS
+   double parallelStrategiesTime = omp_get_wtime();
+#endif
    std::vector<std::vector<int> > parallelismStrategies;
    this->getParallelismStrategies(parallelismStrategies);
+#ifdef HPTT_TIMERS
+   printf("There exists %d parallel strategies. Time: %f ms\n",parallelismStrategies.size(), (omp_get_wtime()-parallelStrategiesTime)*1000);
 
+   double loopOrdersTime = omp_get_wtime();
+#endif
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
+#ifdef HPTT_TIMERS
+   printf("There exists %d parallel strategies. Time: %f ms\n",loopOrders.size(), (omp_get_wtime()-loopOrdersTime)*1000);
+#endif
 
    if( perm_[0] != 0 && ( sizeA_[0] % 16 != 0 || sizeA_[perm_[0]] % 16 != 0 ) ) {
       fprintf(stderr, "Error/TODO: vectorization of remainder\n");
       exit(-1);
    }
 
-   // combine the loopOrder and parallelismStragegies according to their
-   // heuristics, search the space with a growing rectanle (from best to worst,
+   // combine the loopOrder and parallelismStrategies according to their
+   // heuristics, search the space with a growing rectangle (from best to worst,
    // see line marked with ***)
-   for( int start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ); start++ )
-   for( int i = 0; i < parallelismStrategies.size(); i++)
-   {
-      for( int j = 0; j < loopOrders.size(); j++)
+   bool done = false;
+   for( int start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ) && !done; start++ )
+      for( int i = 0; i < parallelismStrategies.size() && !done; i++)
       {
-         if( i > start || j > start || (i != start && j != start) ) continue; //these are already done ***
+         for( int j = 0; j < loopOrders.size() && !done; j++)
+         {
+            if( i > start || j > start || (i != start && j != start) ) continue; //these are already done ***
 
-         auto numThreadsAtLoop = parallelismStrategies[i];
-         auto loopOrder = loopOrders[j];
-         Plan *plan = new Plan(numThreads_, loopOrder, numThreadsAtLoop );
+            auto numThreadsAtLoop = parallelismStrategies[i];
+            auto loopOrder = loopOrders[j];
+            Plan *plan = new Plan(numThreads_, loopOrder, numThreadsAtLoop );
 
 #pragma omp parallel num_threads(numThreads_)
-         {
-            int threadId = omp_get_thread_num();
-            ComputeNode *currentNode = plan->getRootNode(threadId);
+            {
+               int threadId = omp_get_thread_num();
+               ComputeNode *currentNode = plan->getRootNode(threadId);
 
-            int posStride1A_inB = findPos(0, perm_);
-            int posStride1B_inA = perm_[0];
+               int posStride1A_inB = findPos(0, perm_);
+               int posStride1B_inA = perm_[0];
 
 
-            int numThreadsPerComm = numThreads_; //global communicator
-            int threadIdComm = threadId;
-            // create loops
-            for(int i=0; i < dim_; ++i){
-               int index = loopOrder[i];
-               currentNode->inc = this->getIncrement( index );
+               int numThreadsPerComm = numThreads_; //global communicator
+               int threadIdComm = threadId;
+               // create loops
+               for(int i=0; i < dim_; ++i){
+                  int index = loopOrder[i];
+                  currentNode->inc = this->getIncrement( index );
 
-               const int numSubCommunicators = numThreadsAtLoop[index];
-               const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
-               const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
+                  const int numSubCommunicators = numThreadsAtLoop[index];
+                  const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
+                  const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
 
-               numThreadsPerComm /= numSubCommunicators; //numThreads in next comminicator
-               const int commId = (threadIdComm/numThreadsPerComm);
-               threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next Comminicator
+                  numThreadsPerComm /= numSubCommunicators; //numThreads in next communicator
+                  const int commId = (threadIdComm/numThreadsPerComm);
+                  threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next communicator
 
-               currentNode->start = std::min( sizeA_[index], commId * workPerThread * currentNode->inc );
-               currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
+                  currentNode->start = std::min( sizeA_[index], commId * workPerThread * currentNode->inc );
+                  currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
 
-               currentNode->lda = lda_[index];
-               currentNode->ldb = ldb_[findPos(index, perm_)];
+                  currentNode->lda = lda_[index];
+                  currentNode->ldb = ldb_[findPos(index, perm_)];
 
-               if( perm_[0] != 0 || i != dim_-1 ){
-                  currentNode->next = new ComputeNode;
-                  currentNode = currentNode->next;
+                  if( perm_[0] != 0 || i != dim_-1 ){
+                     currentNode->next = new ComputeNode;
+                     currentNode = currentNode->next;
+                  }
+               }
+
+               //macro-kernel
+               if( perm_[0] != 0 )
+               {
+                  currentNode->start = -1;
+                  currentNode->end = -1;
+                  currentNode->inc = -1;
+                  currentNode->lda = lda_[ posStride1B_inA ];
+                  currentNode->ldb = ldb_[ posStride1A_inB ];
+                  currentNode->next = nullptr;
                }
             }
-
-            //macro-kernel
-            if( perm_[0] != 0 )
-            {
-               currentNode->start = -1;
-               currentNode->end = -1;
-               currentNode->inc = -1;
-               currentNode->lda = lda_[ posStride1B_inA ];
-               currentNode->ldb = ldb_[ posStride1A_inB ];
-               currentNode->next = nullptr;
-            }
+            plans.push_back(plan);
+            if( selectionMethod_ == ESTIMATE || selectionMethod_ == PATIENT && plans.size() > 15 || selectionMethod_ == CRAZY && plans.size() > 200 )
+               done = true;
          }
-         plans.push_back(plan);
       }
-   }
-//   printf("#plans: %d\n", plans.size());
-   if( plans.size() != parallelismStrategies.size() * loopOrders.size() )
-   {
-      fprintf(stderr,"Internal error: number of plans does not fit\n");
-      exit(-1);
-   }
 }
 
 /**
@@ -1023,7 +1046,7 @@ double Transpose<floatType>::getTimeLimit() const
    else if( selectionMethod_ == CRAZY )
       return 3600.; // 1h
    else{
-      fprintf(stderr,"ERROR: sectionMethod unknown.\n");
+      fprintf(stderr,"ERROR: selectionMethod unknown.\n");
       exit(-1);
    }
    return -1;
@@ -1036,6 +1059,8 @@ Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
       fprintf(stderr,"Internal error: not enough plans generated.\n");
       exit(-1);
    }
+   if( selectionMethod_ == ESTIMATE ) // fast return
+      return plans[0];
 
    double timeLimit = this->getTimeLimit(); //in seconds
 
