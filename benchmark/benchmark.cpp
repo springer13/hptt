@@ -26,6 +26,14 @@ typedef double floatType;
 #include <ttc_c.h>
 #endif
 
+template<typename floatType>
+floatType getZeroThreashold();
+template<>
+double getZeroThreashold<double>() { return 1e-16;}
+template<>
+float getZeroThreashold<float>() { return 1e-6;}
+
+
 int equal_(const floatType *A, const floatType*B, int total_size){
   int error = 0;
    const floatType *Atmp= A;
@@ -42,7 +50,7 @@ int equal_(const floatType *A, const floatType*B, int total_size){
       diff = (diff < 0) ? -diff : diff;
       if(diff > 0){
          double relError = (diff / max);
-         if(relError > 4e-5){
+         if(relError > 4e-5 && std::min(Aabs,Babs) > getZeroThreashold<floatType>()*5 ){
             printf("%.3e  %.3e %.3e\n",relError, Atmp[i], Btmp[i]);
             error += 1;
          }
@@ -94,8 +102,12 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __
 
       uint32_t strideAinner = strideA[perm[0]];
 
-      for(int i=0; i < sizeInner; ++i)
-         B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
+      if( std::fabs(beta) < getZeroThreashold<floatType>() )
+         for(int i=0; i < sizeInner; ++i)
+            B_[i] = alpha * A_[i * strideAinner];
+      else
+         for(int i=0; i < sizeInner; ++i)
+            B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
    }
 }
 
@@ -179,9 +191,10 @@ int main(int argc, char *argv[])
         perm_[i] = (int)perm[i];
         size_[i] = (int)size[i];
      }
+     //library warm-up
+     auto plan2 = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
 
-     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::MEASURE, numThreads );
-//     transpose.createPlan();
+     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
