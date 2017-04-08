@@ -16,7 +16,7 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
-//#define HPTT_TIMERS
+#define HPTT_TIMERS
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -488,22 +488,24 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       exit(-1);
    }
    
-#pragma omp parallel num_threads(numThreads_)
-   if ( perm_[0] != 0 ) {
-      auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
-         sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+   const int numTasks = plan->getNumTasks();
+#pragma omp parallel for num_threads(numThreads_)
+   for( int taskId = 0; taskId < numTasks; taskId++)
+      if ( perm_[0] != 0 ) {
+         auto rootNode = plan->getRootNode_const( taskId );
+         if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
+            sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+         } else {
+            sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+         }
       } else {
-         sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+         auto rootNode = plan->getRootNode_const( taskId );
+         if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
+            sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
+         }else{
+            sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
+         }
       }
-   } else {
-      auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
-         sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
-      }else{
-         sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
-      }
-   }
 }
 
 template<typename floatType>
@@ -514,22 +516,24 @@ void Transpose<floatType>::execute() noexcept
       exit(-1);
    }
    
-#pragma omp parallel num_threads(numThreads_)
-   if ( perm_[0] != 0 ) {
-      auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+   const int numTasks = masterPlan_->getNumTasks();
+#pragma omp parallel for num_threads(numThreads_)
+   for( int taskId = 0; taskId < numTasks; taskId++)
+      if ( perm_[0] != 0 ) {
+         auto rootNode = masterPlan_->getRootNode_const( taskId );
+         if( std::fabs(beta_) < 1e-17 ) {
+            sTranspose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+         } else {
+            sTranspose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+         }
       } else {
-         sTranspose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+         auto rootNode = masterPlan_->getRootNode_const( taskId );
+         if( std::fabs(beta_) < 1e-17 ) {
+            sTranspose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
+         } else {
+            sTranspose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
+         }
       }
-   } else {
-      auto rootNode = masterPlan_->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < 1e-17 ) {
-         sTranspose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
-      } else {
-         sTranspose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
-      }
-   }
 }
 
 template<typename floatType>
@@ -828,6 +832,7 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
    }
 }
 
+// returns the best loop order (same as the best one with exhaustive search)
 template<typename floatType>
 void Transpose<floatType>::getBestLoopOrder( std::vector<int> &loopOrder ) const
 {
@@ -1038,19 +1043,19 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 
             auto numThreadsAtLoop = parallelismStrategies[i];
             auto loopOrder = loopOrders[j];
-            Plan *plan = new Plan(numThreads_, loopOrder, numThreadsAtLoop );
+            Plan *plan = new Plan(loopOrder, numThreadsAtLoop );
+            const int numTasks = plan->getNumTasks();
 
-#pragma omp parallel num_threads(numThreads_)
+#pragma omp parallel for num_threads(numThreads_)
+            for( int taskId = 0; taskId < numTasks; taskId++)
             {
-               int threadId = omp_get_thread_num();
-               ComputeNode *currentNode = plan->getRootNode(threadId);
+               ComputeNode *currentNode = plan->getRootNode(taskId);
 
                int posStride1A_inB = findPos(0, perm_);
                int posStride1B_inA = perm_[0];
 
-
-               int numThreadsPerComm = numThreads_; //global communicator
-               int threadIdComm = threadId;
+               int numThreadsPerComm = numTasks; //global communicator
+               int taskIdComm = taskId;
                // create loops
                for(int l=0; l < dim_; ++l){
                   int index = loopOrder[l];
@@ -1061,8 +1066,8 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
                   const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
 
                   numThreadsPerComm /= numSubCommunicators; //numThreads in next communicator
-                  const int commId = (threadIdComm/numThreadsPerComm);
-                  threadIdComm = threadIdComm % numThreadsPerComm; // local threadId in next communicator
+                  const int commId = (taskIdComm/numThreadsPerComm);
+                  taskIdComm = taskIdComm % numThreadsPerComm; // local taskId in next communicator
 
                   currentNode->start = std::min( sizeA_[index], commId * workPerThread * currentNode->inc );
                   currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );

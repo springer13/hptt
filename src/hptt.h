@@ -36,8 +36,11 @@ class ComputeNode{
 
 class Plan{
    public:
-      Plan(int numThreads, std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop) : numThreads_(numThreads), rootNodes_(nullptr), loopOrder_(loopOrder), numThreadsAtLoop_(numThreadsAtLoop) {
-         rootNodes_ = new ComputeNode[numThreads];
+      Plan(std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop) : rootNodes_(nullptr), loopOrder_(loopOrder), numThreadsAtLoop_(numThreadsAtLoop) {
+         numTasks_ = 1;
+         for(auto nt : numThreadsAtLoop)
+            numTasks_ *= nt;
+         rootNodes_ = new ComputeNode[numTasks_];
       }
 
       ~Plan() {
@@ -51,9 +54,10 @@ class Plan{
       }
       const ComputeNode* getRootNode_const(int threadId) const { return &rootNodes_[threadId]; }
       ComputeNode* getRootNode(int threadId) const { return &rootNodes_[threadId]; }
+      int getNumTasks() const { return numTasks_; } 
 
    private:
-      int numThreads_;
+      int numTasks_;
       std::vector<int> loopOrder_;
       std::vector<int> numThreadsAtLoop_;
       ComputeNode *rootNodes_;
