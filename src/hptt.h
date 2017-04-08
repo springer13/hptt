@@ -79,7 +79,7 @@ class Transpose{
                  floatType *B,
                  const floatType beta,
                  const SelectionMethod selectionMethod,
-                 const int numThreads ) : 
+                 const int numThreads) : 
          A_(A),
          B_(B),
          alpha_(alpha),
@@ -88,7 +88,8 @@ class Transpose{
          numThreads_(numThreads), 
          masterPlan_(nullptr),
          blocking_constStride1_(1), //TODO
-         selectionMethod_(selectionMethod)
+         selectionMethod_(selectionMethod),
+         selectedParallelStrategyId_(-1)
       {
          sizeA_.resize(dim);
          perm_.resize(dim);
@@ -122,6 +123,7 @@ class Transpose{
        ***************************************************/
       int getNumThreads() const noexcept { return numThreads_; }
       void setNumThreads(int numThreads) noexcept { numThreads_ = numThreads; }
+      void setParallelStrategy(int id) noexcept { selectedParallelStrategyId_ = id; }
       floatType getAlpha() const noexcept { return alpha_; }
       floatType getBeta() const noexcept { return beta_; }
       void setAlpha(floatType alpha) noexcept { alpha_ = alpha; }
@@ -150,6 +152,7 @@ class Transpose{
        ***************************************************/
       float estimateExecutionTime( const Plan *plan); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
+      void getBestLoopOrder( std::vector<int> &loopOrder ) const;
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
       void getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const;
       void getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 
@@ -173,6 +176,7 @@ class Transpose{
       std::vector<size_t> lda_; 
       std::vector<size_t> ldb_; 
       int numThreads_;
+      int selectedParallelStrategyId_;
 
       Plan *masterPlan_; 
       SelectionMethod selectionMethod_;
@@ -180,7 +184,7 @@ class Transpose{
       static constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      static constexpr int infoLevel_ = 0; // determines which auxiliary messages should be printed
+      static constexpr int infoLevel_ = 1; // determines which auxiliary messages should be printed
 };
 
 void trashCache(double *A, double *B, int n);
@@ -195,9 +199,9 @@ auto create_plan(const int *sizeA,
                  float *B,
                  const float beta,
                  const SelectionMethod selectionMethod,
-                 const int numThreads )
+                 const int numThreads)
 {
-   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
    plan->createPlan();
    return plan;
 }

@@ -16,7 +16,7 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
-#define HPTT_TIMERS
+//#define HPTT_TIMERS
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -563,8 +563,10 @@ void Transpose<floatType>::getAllParallelismStrategies( std::list<int> &primeFac
                                              std::vector<std::vector<int> > &parallelismStrategies) const
 {
    if( primeFactorsToMatch.size() > 0 ){
+      // match every primefactor ...
       for( auto p : primeFactorsToMatch )
       {
+         // ... with every loop
          for( int i = 0; i < dim_; i++ )
          {
             std::list<int> primeFactorsToMatch_(primeFactorsToMatch); 
@@ -1015,6 +1017,14 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
       exit(-1);
    }
 
+   if( selectedParallelStrategyId_ != -1 ){
+      int selectedParallelStrategyId = std::min((int)parallelismStrategies.size()-1, selectedParallelStrategyId_);
+      std::vector<int>parStrategy(parallelismStrategies[selectedParallelStrategyId]);
+      printVector(parStrategy,"selected parallel: ");
+      parallelismStrategies.clear();
+      parallelismStrategies.push_back(parStrategy);
+   }
+
    // combine the loopOrder and parallelismStrategies according to their
    // heuristics, search the space with a growing rectangle (from best to worst,
    // see line marked with ***)
@@ -1042,8 +1052,8 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
                int numThreadsPerComm = numThreads_; //global communicator
                int threadIdComm = threadId;
                // create loops
-               for(int i=0; i < dim_; ++i){
-                  int index = loopOrder[i];
+               for(int l=0; l < dim_; ++l){
+                  int index = loopOrder[l];
                   currentNode->inc = this->getIncrement( index );
 
                   const int numSubCommunicators = numThreadsAtLoop[index];
@@ -1060,7 +1070,7 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
                   currentNode->lda = lda_[index];
                   currentNode->ldb = ldb_[findPos(index, perm_)];
 
-                  if( perm_[0] != 0 || i != dim_-1 ){
+                  if( perm_[0] != 0 || l != dim_-1 ){
                      currentNode->next = new ComputeNode;
                      currentNode = currentNode->next;
                   }
