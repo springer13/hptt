@@ -1,11 +1,12 @@
 CXX_FLAGS=-O3 -qopenmp -xhost -std=c++14
+CXX=icpc
 
-SRC=benchmark.cpp
+SRC=benchmark.cpp reference.cpp
 OBJ=$(SRC:.cpp=.o)
 
-INCLUDE_PATH=-I../src/
+INCLUDE_PATH=-I../src/ 
 LIB_PATH=-L../lib/
-LIBS=-lhptt
+LIBS=-lhptt_proto #-lhptc -lttc_c
 
 all: ${OBJ}
 	${CXX} ${OBJ} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} -o benchmark.exe

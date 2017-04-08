@@ -17,8 +17,8 @@
 #include <hptc/hptc.h>
 
 
-//typedef float floatType;
-typedef double floatType;
+typedef float floatType;
+//typedef double floatType;
 
 //#define ORIG_TTC
 //#define RELEASE_HPTT
@@ -65,51 +65,8 @@ void restore(const floatType* A, floatType* B, size_t n)
       B[i] = A[i];
 }
 
-void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __restrict__ A, floatType alpha, floatType* __restrict__ B, floatType beta)
-{
-   // compute stride for all dimensions w.r.t. A
-   uint32_t strideA[dim];
-   strideA[0] = 1;
-   for(int i=1; i < dim; ++i)
-      strideA[i] = strideA[i-1] * size[i-1];
+void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __restrict__ A, floatType alpha, floatType* __restrict__ B, floatType beta);
 
-   // combine all non-stride-one dimensions of B into a single dimension for
-   // maximum parallelism
-   uint32_t sizeOuter = 1;
-   for(int i=0; i < dim; ++i)
-      if( i != perm[0] )
-         sizeOuter *= size[i]; 
-
-   uint32_t sizeInner = size[perm[0]];
-
-   // This implementation traverses the output tensor in a linear fashion
-   
-#pragma omp parallel for
-   for(uint32_t j=0; j < sizeOuter; ++j)
-   {
-      uint32_t offsetA = 0;
-      uint32_t offsetB = 0;
-      uint32_t j_tmp = j;
-      for(int i=1; i < dim; ++i)
-      {
-         int current_index = j_tmp % size[perm[i]];
-         j_tmp /= size[perm[i]];
-         offsetA += current_index * strideA[perm[i]];
-      }
-
-      const floatType* __restrict__ A_ = A + offsetA;
-      floatType* __restrict__ B_ = B + j*sizeInner;
-
-      uint32_t strideAinner = strideA[perm[0]];
-
-      if( std::fabs(beta) < getZeroThreashold<floatType>() )
-         for(int i=0; i < sizeInner; ++i)
-            B_[i] = alpha * A_[i * strideAinner];
-      else
-         for(int i=0; i < sizeInner; ++i)
-            B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
-   }
-}
 
 int main(int argc, char *argv[]) 
 {
@@ -117,8 +74,8 @@ int main(int argc, char *argv[])
   if( getenv("OMP_NUM_THREADS") != NULL )
      numThreads = atoi(getenv("OMP_NUM_THREADS"));
   printf("numThreads: %d\n",numThreads);
-  floatType alpha = 2.2;
-  floatType beta = 4.1;
+  floatType alpha = 2.;
+  floatType beta = 4.;
   //beta = 0; 
 
   if( argc < 2 ){
@@ -194,7 +151,10 @@ int main(int argc, char *argv[])
      //library warm-up
      auto plan2 = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
 
-     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
+//     for(int par = 0; par < 20; par++){
+     hptt::Transpose<floatType> transpose( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads);
+//     transpose.setParallelStrategy(par);
+     transpose.createPlan();
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
@@ -202,11 +162,12 @@ int main(int argc, char *argv[])
         hptt::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
-        plan->execute();
+        transpose.execute();
         auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
      printf("HPTT (proto) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
+//     }
   }
 
   { // reference
