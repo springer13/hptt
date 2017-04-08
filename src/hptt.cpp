@@ -16,7 +16,7 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
-//#define HPTT_TIMERS
+#define HPTT_TIMERS
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -474,6 +474,13 @@ void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __
 
 
 template<typename floatType>
+floatType getZeroThreashold();
+template<>
+double getZeroThreashold<double>() { return 1e-16;}
+template<>
+float getZeroThreashold<float>() { return 1e-6;}
+
+template<typename floatType>
 void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 {
    if( plan == nullptr ) {
@@ -484,14 +491,14 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 #pragma omp parallel num_threads(numThreads_)
    if ( perm_[0] != 0 ) {
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < 1e-17 ) {
+      if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
          sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       } else {
          sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
       }
    } else {
       auto rootNode = plan->getRootNode_const( omp_get_thread_num() );
-      if( std::fabs(beta_) < 1e-17 ) {
+      if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
          sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
       }else{
          sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
@@ -820,28 +827,91 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
 }
 
 template<typename floatType>
+void Transpose<floatType>::getBestLoopOrder( std::vector<int> &loopOrder ) const
+{
+   // create cost matrix; cost[i,idx] === cost for idx being at loop-level i
+   double costs[dim_*dim_];
+   for(int i=0;i < dim_ ; ++i){
+      for(int idx=0;idx < dim_ ; ++idx){ //idx is at loop i
+         double cost = 0;
+         if( i != 0 ){
+            const int posB = findPos(idx, perm_);
+            const int importanceA = (1<<(dim_ - idx)); // stride-1 has the most importance ...
+            const int importanceB = (1<<(dim_ - posB));                // subsequent indices are half as important
+            const int penalty = 10 * (1<<(i-1));
+            constexpr double bias = 1.01;
+            cost = (importanceA + importanceB * bias) * penalty;
+         }
+         costs[i + idx * dim_] = cost;
+//         printf("%e ",cost);
+      }
+//      printf("\n");
+   }
+   std::list<int> availLoopLevels; //available rows
+   std::list<int> availIndices;
+   for(int i=0;i < dim_ ; ++i){
+      availLoopLevels.push_back(i);
+      availIndices.push_back(i);
+   }
+
+   // create best loop order constructively without generating all
+   for(int i=0;i < dim_ ; ++i){
+      //find column with maximum cost
+      int selectedIdx= 0;
+      double maxValueAll = 0;
+      for(auto c : availIndices)
+      {
+         double maxValue = 0;
+         for(auto r : availLoopLevels){
+            const double val = costs[c * dim_ + r];
+            maxValue = (val > maxValue) ? val : maxValue;
+         }
+
+         if(maxValue > maxValueAll){
+            maxValueAll = maxValue;
+            selectedIdx= c;
+         }
+      }
+      //find minimum in that column
+      int selectedLoopLevel = 0;
+      double minValue = 1e100;
+      for(auto r : availLoopLevels){
+         const double val = costs[selectedIdx * dim_ + r];
+         if(val < minValue){
+            minValue = val;
+            selectedLoopLevel = r;
+         }
+      }
+      // update loop order
+      loopOrder[dim_-1-i] = selectedIdx; //innermost loop idx is stored at dim_-1
+      // remove selected row
+      for( auto it = availLoopLevels.begin(); it != availLoopLevels.end(); it++ )
+         if(*it == selectedLoopLevel){
+            availLoopLevels.erase(it);
+            break;
+         }
+      // remove selected col
+      for( auto it = availIndices.begin(); it != availIndices.end(); it++ )
+         if(*it == selectedIdx){
+            availIndices.erase(it);
+            break;
+         }
+   }
+}
+
+template<typename floatType>
 double Transpose<floatType>::loopCostHeuristic( const std::vector<int> &loopOrder ) const
 {
-   // penalize different loop-orders differently
-   double loopPenalty[dim_];
-   loopPenalty[dim_-1] = 0;
-   double penalty = 10;
-   for(int i=dim_ - 2;i >= 0; i--){
-      loopPenalty[i] = penalty;
-      penalty *= 2;
-   }
-   // loopPenalty looks like this: [...,40,20,10,0]
-   // Rationale: as inner-most indices move towards the outer-most loops, they
-   // should be penalized more
-
-   double loopCost = 0.0;
-   double importance = 1.0;
-   for(int i=0;i < dim_ ; ++i){
-      int posA = findPos(i, loopOrder);
-      int posB = findPos(perm_[i], loopOrder);
-      loopCost += (loopPenalty[posA] + loopPenalty[posB] * 1.01 ) * importance; // B is slighly more important than A
-      importance /= 2; // indices become less and less important as we go towards the outer-most indices
-   }
+   double loopCost= 0.0;
+   for(int i=1;i < dim_ ; ++i){
+      const int idx = loopOrder[dim_-1-i];
+      const int posB = findPos(idx, perm_);
+      const int importanceA = (1<<(dim_ - idx)); // stride-1 has the most importance ...
+      const int importanceB = (1<<(dim_ - posB));                // subsequent indices are half as important
+      const int penalty = 10 * (1<<(i-1));
+      double bias = 1.01;
+      loopCost += (importanceA + importanceB * bias) * penalty;
+   } 
 
    return loopCost;
 }
@@ -849,9 +919,13 @@ double Transpose<floatType>::loopCostHeuristic( const std::vector<int> &loopOrde
 template<typename floatType>
 void Transpose<floatType>::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
-//   std::vector<int> loopOrder1 { 5, 3, 4, 1, 0, 2 };
-//   loopOrders.push_back(loopOrder1 );
-//   return;
+   if( selectionMethod_ == ESTIMATE ){
+      std::vector<int> bestLoopOrder(dim_);
+      getBestLoopOrder( bestLoopOrder );
+      loopOrders.push_back(bestLoopOrder);
+      return;
+   }
+
    loopOrders.clear();
    std::vector<int> loopOrder;
    for(int i = 0; i < dim_; i++)
@@ -895,6 +969,10 @@ void Transpose<floatType>::createPlan()
    timeStart = omp_get_wtime();
 #endif
    masterPlan_ = selectPlan( allPlans );
+   if( this->infoLevel_ > 0 ){
+      printf("Configuration of best plan:\n");
+      masterPlan_->print();
+   }
 #ifdef HPTT_TIMERS
    printf("SelectPlan() took %f ms\n",(omp_get_wtime()-timeStart)*1000);
    timeStart = omp_get_wtime();
@@ -929,11 +1007,11 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
    std::vector<std::vector<int> > loopOrders;
    this->getLoopOrders(loopOrders);
 #ifdef HPTT_TIMERS
-   printf("There exists %d parallel strategies. Time: %f ms\n",loopOrders.size(), (omp_get_wtime()-loopOrdersTime)*1000);
+   printf("There exists %d loop orders. Time: %f ms\n",loopOrders.size(), (omp_get_wtime()-loopOrdersTime)*1000);
 #endif
 
-   if( perm_[0] != 0 && ( sizeA_[0] % 16 != 0 || sizeA_[perm_[0]] % 16 != 0 ) ) {
-      fprintf(stderr, "Error/TODO: vectorization of remainder\n");
+   if( perm_[0] != 0 && ( sizeA_[0] % (blocking_/4) != 0 || sizeA_[perm_[0]] % (blocking_/4) != 0 ) ) {
+      fprintf(stderr, "Error/TODO: add scalar remainder\n");
       exit(-1);
    }
 
@@ -1091,10 +1169,6 @@ Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
       }
       if( this->infoLevel_ > 0 )
          printf("We evaluated %d/%d candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
-   }
-   if( this->infoLevel_ > 0 ){
-      printf("Configuration of best plan:\n");
-      plans[bestPlan_id]->print();
    }
    return plans[bestPlan_id];
 }
