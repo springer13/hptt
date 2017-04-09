@@ -467,6 +467,7 @@ void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __
          for(int32_t i = plan->start; i < end; i+= inc)
             B[i] = alpha * A[i] + beta * B[i];
       } else {
+#pragma vector nontemporal
          for(int32_t i = plan->start; i < end; i+= inc)
             B[i] = alpha * A[i];
       }
