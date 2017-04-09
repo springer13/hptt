@@ -8,6 +8,8 @@ The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on
 * Multi-threading support
 * Explicit vectorization
 * Auto-tuning (akin to FFTW)
+    * Loop order
+    * Parallelization
 
 Keep in mind that this is an early prototype; a fully functional version will be
 available shortly.
@@ -15,16 +17,13 @@ available shortly.
 
 # Install
 
-1. Clone the repository into a desired directory and change to that location:
+Clone the repository into a desired directory and change to that location:
 
     git clone https://github.com/springer13/hptt.git
     cd hptt
+    make
 
-2. Compiler HPTT:
-
-   make
-
-This should create 'libhptt.so' insdide the lib folder.
+This should create 'libhptt.so' insdide the ./lib folder.
 
 
 # Getting Started
@@ -53,7 +52,8 @@ In general HPTT is used as follows:
 
 You must have a working C++ compiler. I have tested HPTT with:
 
-* Intel's ICC (>= 15.0)
+* Intel's ICPC (>= 15.0)
+* GNU g++ 6.2
 
 # Benchmark
 
