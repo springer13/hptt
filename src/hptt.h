@@ -154,8 +154,17 @@ class Transpose{
       /***************************************************
        * Helper Methods
        ***************************************************/
+      // parallelizes the loops by changing the value of parallelismStrategy
+      void parallelize( std::vector<int> &parallelismStrategy,
+                                        std::vector<int> &availableParallelismAtLoop, 
+                                        int &totalTasks,
+                                        std::list<int> &primeFactors, 
+                                        const float minBalancing,
+                                        const std::vector<int> &loopsAllowed) const;
+      float getLoadBalance( const std::vector<int> &parallelismStrategy ) const;
       float estimateExecutionTime( const Plan *plan); //execute just a few iterations and exterpolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
+      void getBestParallelismStrategy ( std::vector<int> &bestParallelismStrategy ) const;
       void getBestLoopOrder( std::vector<int> &loopOrder ) const;
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
       void getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const;
@@ -188,7 +197,7 @@ class Transpose{
       static constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      static constexpr int infoLevel_ = 1; // determines which auxiliary messages should be printed
+      static constexpr int infoLevel_ = 0; // determines which auxiliary messages should be printed
 };
 
 void trashCache(double *A, double *B, int n);

@@ -16,7 +16,7 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
-#define HPTT_TIMERS
+//#define HPTT_TIMERS
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 #define INLINE __forceinline
@@ -594,6 +594,177 @@ void Transpose<floatType>::getAllParallelismStrategies( std::list<int> &primeFac
    }
 }
 
+// balancing if one tries to parallelize avail many tasks with req many threads
+// e.g., balancing(3,4) = 0.75
+static float getBalancing(int avail, int req)
+{
+   return (float)(avail)/(((avail+req-1)/req)*req);
+}
+
+template<typename floatType>
+float Transpose<floatType>::getLoadBalance( const std::vector<int> &parallelismStrategy ) const
+{
+   std::vector<int> availableParallelismAtLoop;
+   this->getAvailableParallelism( availableParallelismAtLoop);
+   float load_balance = 1.0;
+   int totalTasks = 1;
+   for(int i=0; i < dim_; ++i){
+      load_balance *= getBalancing(availableParallelismAtLoop[i], parallelismStrategy[i]); 
+      totalTasks *= parallelismStrategy[i];
+   }
+
+   //how well can these tasks be distributed among numThreads_?
+   // e.g., totalTasks = 3, numThreads = 8 => 3./8
+   // e.g., totalTasks = 5, numThreads = 8 => 5./8
+   // e.g., totalTasks = 15, numThreads = 8 => 15./16
+   // e.g., totalTasks = 17, numThreads = 8 => 17./24
+   float workDistribution = ((float)totalTasks) / (((totalTasks + numThreads_ - 1)/numThreads_)*numThreads_);
+
+   load_balance *= workDistribution ;
+   return load_balance; 
+}
+
+template<typename floatType>
+void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestParallelismStrategy ) const
+{
+   std::vector<int> availableParallelismAtLoop;
+   this->getAvailableParallelism( availableParallelismAtLoop);
+   // Objectives: 1) load-balancing 
+   //             2) avoid parallelizing stride-1 loops (rational: less consecutive memory accesses)
+   //             3) avoid false sharing
+
+   std::vector<int> loopsAllowed;
+   for(int i=dim_-1; i >= 1; i--)
+      if(perm_[i] != 0)
+         loopsAllowed.push_back(perm_[i]);
+   std::vector<int> loopsAllowedStride1 {0,perm_[0]};
+
+   int totalTasks = 1; // goal: totalTasks should be a close multiple of numTasks_
+   std::list<int> primeFactors;
+   getPrimeFactors( numThreads_, primeFactors );
+
+   // 1. parallelize using 100% load balancing
+   parallelize( bestParallelismStrategy, availableParallelismAtLoop, totalTasks, primeFactors, 1.0, loopsAllowed);
+ 
+   if( totalTasks != numThreads_ )
+   { // no perfect match has been found
+
+      // Option 1: keep parallelizing non-stride-1 loops only, but allowing load-imbalance
+      std::vector<int> strat1(bestParallelismStrategy);
+      std::vector<int> avail1(availableParallelismAtLoop);
+      std::list<int> primes1(primeFactors);
+      int totalTasks1 = totalTasks;
+      parallelize( strat1, avail1, totalTasks1, primes1, 0.92, loopsAllowed);
+      if( getLoadBalance(strat1) > 0.90 )
+      {
+         std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
+         return;
+      }
+
+      if(perm_[0] != 0)
+      {
+         // Option 2: also parallelize stride-1 loops, enforcing perfect loop balancing
+         std::vector<int> strat2(bestParallelismStrategy);
+         std::vector<int> avail2(availableParallelismAtLoop);
+         std::list<int> primes2(primeFactors);
+         int totalTasks2 = totalTasks;
+         parallelize( strat2, avail2, totalTasks2, primes2, 1.0, loopsAllowedStride1 );
+         if( getLoadBalance(strat2) > 0.92 )
+         {
+            std::copy(strat2.begin(), strat2.end(), bestParallelismStrategy.begin());
+            return;
+         }
+
+         //keep on going based on strat1
+         parallelize( strat1, avail1, totalTasks1, primes1, 1.0, loopsAllowedStride1 );
+         if( getLoadBalance(strat1) > 0.90 )
+         {
+            std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
+            return;
+         }
+
+         //keep on going based on strat2
+         parallelize( strat2, avail2, totalTasks2, primes2, 0.92, loopsAllowed);
+         if( getLoadBalance(strat2) > 0.92 )
+         {
+            std::copy(strat2.begin(), strat2.end(), bestParallelismStrategy.begin());
+            return;
+         }
+
+         if( getLoadBalance(strat1) > 0.80 ) //reduced threshold
+         {
+            std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
+            return;
+         }
+         if( getLoadBalance(strat2) > 0.82 ) //reduced threshold
+         {
+            std::copy(strat2.begin(), strat2.end(), bestParallelismStrategy.begin());
+            return;
+         }
+
+         parallelize( strat1, avail1, totalTasks1, primes1, 0.9, loopsAllowedStride1 );
+         parallelize( strat2, avail2, totalTasks2, primes2, 0.8, loopsAllowed );
+         float lb1 = getLoadBalance(strat1);
+         float lb2 = getLoadBalance(strat2);
+         if( lb1 > 0.8 && lb2 < 0.85 || lb1 >lb2 && lb1 > 0.75 )
+         {
+            std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
+            return;
+         }
+         if(lb2 >= 0.85)
+         {
+            std::copy(strat2.begin(), strat2.end(), bestParallelismStrategy.begin());
+            return;
+         }
+
+         //fallback
+         std::vector<int> allLoops;
+         for(int i=dim_-1; i >= 1; i--)
+            allLoops.push_back(perm_[i]);
+         allLoops.push_back(0);
+         allLoops.push_back(perm_[0]);
+         parallelize( strat1, avail1, totalTasks1, primes1, 0., allLoops);
+
+      }else{
+         parallelize( strat1, avail1, totalTasks1, primes1, 0.0, loopsAllowed);
+         std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
+      }
+   }
+}
+
+template<typename floatType>
+void Transpose<floatType>::parallelize( std::vector<int> &parallelismStrategy,
+                                        std::vector<int> &availableParallelismAtLoop, 
+                                        int &totalTasks,
+                                        std::list<int> &primeFactors, 
+                                        const float minBalancing, const std::vector<int> &loopsAllowed ) const
+   
+{
+   // find loop which minimizes load imbalance for the given prime factor
+   for(auto it = primeFactors.begin(); it != primeFactors.end(); it++)
+   {
+      int suitedLoop = -1;
+      float bestBalancing = 0;
+      for(auto idx : loopsAllowed )
+      {
+         int avail = availableParallelismAtLoop[idx];
+         int req   = *it;
+         float balancing = getBalancing(avail, req);
+         if(balancing > bestBalancing){
+            bestBalancing = balancing;
+            suitedLoop = idx;
+         }
+      }
+      if( suitedLoop != -1 && bestBalancing >= minBalancing ){
+         availableParallelismAtLoop[suitedLoop] /= *it;
+         parallelismStrategy[suitedLoop] *= *it;
+         totalTasks *= *it;
+         it = primeFactors.erase(it);
+         it--;
+      }
+   }
+}
+
 template<typename floatType>
 double Transpose<floatType>::parallelismCostHeuristic( const std::vector<int> &achievedParallelismAtLoop ) const
 {
@@ -632,9 +803,14 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
 {
    parallelismStrategies.clear();
    if( numThreads_ == 1 ){
-      parallelismStrategies.push_back(std::vector<int>(dim_, 1));
+      parallelismStrategies.emplace_back(std::vector<int>(dim_, 1));
       return;
    }
+   parallelismStrategies.emplace_back(std::vector<int>(dim_, 1));
+   getBestParallelismStrategy(parallelismStrategies[0]);
+
+   if( selectionMethod_ == ESTIMATE )
+      return;
 
    // ATTENTION: we don't care about the case where numThreads_ is a large prime number...
    // (sorry, KNC)
@@ -770,7 +946,7 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
 #ifdef DEBUG
          fprintf(stderr,"MERGING indices %d and %d\n",perm[i], perm[i+1]); 
 #endif
-         fusedIndices.push_back( std::make_tuple(perm_[dim_],perm[i+1]) );
+         fusedIndices.emplace_back( std::make_tuple(perm_[dim_],perm[i+1]) );
          i++;
       }
       dim_++;
@@ -926,14 +1102,13 @@ double Transpose<floatType>::loopCostHeuristic( const std::vector<int> &loopOrde
 template<typename floatType>
 void Transpose<floatType>::getLoopOrders(std::vector<std::vector<int> > &loopOrders) const
 {
+   loopOrders.clear();
    if( selectionMethod_ == ESTIMATE ){
-      std::vector<int> bestLoopOrder(dim_);
-      getBestLoopOrder( bestLoopOrder );
-      loopOrders.push_back(bestLoopOrder);
+      loopOrders.emplace_back(std::vector<int>(dim_));
+      getBestLoopOrder( loopOrders[0] );
       return;
    }
 
-   loopOrders.clear();
    std::vector<int> loopOrder;
    for(int i = 0; i < dim_; i++)
       loopOrder.push_back(i);
@@ -1030,6 +1205,9 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
       parallelismStrategies.push_back(parStrategy);
    }
 
+   const int posStride1A_inB = findPos(0, perm_);
+   const int posStride1B_inA = perm_[0];
+
    // combine the loopOrder and parallelismStrategies according to their
    // heuristics, search the space with a growing rectangle (from best to worst,
    // see line marked with ***)
@@ -1051,23 +1229,20 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
             {
                ComputeNode *currentNode = plan->getRootNode(taskId);
 
-               int posStride1A_inB = findPos(0, perm_);
-               int posStride1B_inA = perm_[0];
-
-               int numThreadsPerComm = numTasks; //global communicator
-               int taskIdComm = taskId;
-               // create loops
+               int numThreadsPerComm = numTasks; //global communicator // e.g., 6
+               int taskIdComm = taskId; // e.g., 0,1,2,3,4,5
+               // divide each loop-level l, corresponding to index loopOrder[l], into numThreadsAtLoop[index] chunks
                for(int l=0; l < dim_; ++l){
-                  int index = loopOrder[l];
+                  const int index = loopOrder[l];
                   currentNode->inc = this->getIncrement( index );
 
-                  const int numSubCommunicators = numThreadsAtLoop[index];
-                  const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc;
-                  const int workPerThread = (numParallelismAvailable + numSubCommunicators -1) / numSubCommunicators;
+                  const int numTasksAtLevel = numThreadsAtLoop[index]; //  e.g., 3
+                  const int numParallelismAvailable = (sizeA_[index] + currentNode->inc - 1) / currentNode->inc; // e.g., 5
+                  const int workPerThread = (numParallelismAvailable + numTasksAtLevel -1) / numTasksAtLevel; // ceil(5/3) = 2
 
-                  numThreadsPerComm /= numSubCommunicators; //numThreads in next communicator
-                  const int commId = (taskIdComm/numThreadsPerComm);
-                  taskIdComm = taskIdComm % numThreadsPerComm; // local taskId in next communicator
+                  numThreadsPerComm /= numTasksAtLevel; //numThreads in next communicator // 6/3 = 2
+                  const int commId = (taskIdComm/numThreadsPerComm); //  = 0,0,1,1,2,2
+                  taskIdComm = taskIdComm % numThreadsPerComm; // local taskId in next communicator // 0,1,0,1,0,1
 
                   currentNode->start = std::min( sizeA_[index], commId * workPerThread * currentNode->inc );
                   currentNode->end = std::min( sizeA_[index], (commId+1) * workPerThread * currentNode->inc );
@@ -1093,7 +1268,10 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
                }
             }
             plans.push_back(plan);
-            if( selectionMethod_ == ESTIMATE || selectionMethod_ == PATIENT && plans.size() > 15 || selectionMethod_ == CRAZY && plans.size() > 200 )
+            if( selectionMethod_ == ESTIMATE || 
+                selectionMethod_ == MEASURE && plans.size() > 200 || 
+                selectionMethod_ == PATIENT && plans.size() > 400 || 
+                selectionMethod_ == CRAZY && plans.size() > 800 )
                done = true;
          }
       }
