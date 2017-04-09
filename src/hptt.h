@@ -202,7 +202,7 @@ class Transpose{
 
 void trashCache(double *A, double *B, int n);
 
-auto create_plan(const int *sizeA, 
+std::shared_ptr<hptt::Transpose<float> > create_plan(const int *sizeA, 
                  const int *perm, 
                  const int *outerSizeA, 
                  const int *outerSizeB, 
@@ -219,7 +219,7 @@ auto create_plan(const int *sizeA,
    return plan;
 }
 
-auto create_plan(const int *sizeA, 
+std::shared_ptr<hptt::Transpose<double> > create_plan(const int *sizeA, 
                  const int *perm, 
                  const int *outerSizeA, 
                  const int *outerSizeB, 

@@ -2,6 +2,7 @@
 #define HPTT_UTILS_H
 
 #include <list>
+#include <iostream>
 
 namespace hptt {
 
