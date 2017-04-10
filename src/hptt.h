@@ -204,7 +204,7 @@ class Transpose{
       static constexpr int blocking_ = blocking_micro_ * 4;
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      static constexpr int infoLevel_ = 1; // determines which auxiliary messages should be printed
+      static constexpr int infoLevel_ = 0; // determines which auxiliary messages should be printed
 };
 
 void trashCache(double *A, double *B, int n);
