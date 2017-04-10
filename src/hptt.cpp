@@ -816,6 +816,8 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
          parallelize( strat2, avail2, totalTasks2, primes2, 0.8, loopsAllowed );
          float lb1 = getLoadBalance(strat1);
          float lb2 = getLoadBalance(strat2);
+//         printVector(strat2,"strat2");
+//         printf("strat2: %f\n",getLoadBalance(strat2));
          if( lb1 > 0.8 && lb2 < 0.85 || lb1 >lb2 && lb1 > 0.75 )
          {
             std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
@@ -851,20 +853,27 @@ void Transpose<floatType>::parallelize( std::vector<int> &parallelismStrategy,
                                         const float minBalancing, const std::vector<int> &loopsAllowed ) const
    
 {
+   bool suboptimalParallelizationUsed = false;
    // find loop which minimizes load imbalance for the given prime factor
    for(auto it = primeFactors.begin(); it != primeFactors.end(); it++)
    {
       int suitedLoop = -1;
       float bestBalancing = 0;
+
       for(auto idx : loopsAllowed )
       {
-         int avail = availableParallelismAtLoop[idx];
-         int req   = *it;
-         float balancing = getBalancing(avail, req);
+         float balancing = getBalancing(availableParallelismAtLoop[idx], *it);
          if(balancing > bestBalancing){
             bestBalancing = balancing;
             suitedLoop = idx;
          }
+      }
+      //allow up to one slightly less optimal splitting to prefer parallelizing
+      //idx=0 over idx=perm[0]
+      if( suboptimalParallelizationUsed == false &&
+            suitedLoop == perm_[0] && getBalancing(availableParallelismAtLoop[0], *it) >= 0.949 ){
+         suitedLoop = 0;
+         suboptimalParallelizationUsed = true;
       }
       if( suitedLoop != -1 && bestBalancing >= minBalancing ){
          availableParallelismAtLoop[suitedLoop] /= *it;
