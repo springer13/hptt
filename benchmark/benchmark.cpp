@@ -11,10 +11,10 @@
 #include <omp.h>
 #include <stdlib.h>
 #include <math.h>
+#include <cmath>
 
 #include "../src/hptt.h"
 
-#include <hptc/hptc.h>
 
 
 typedef float floatType;
@@ -25,9 +25,12 @@ typedef float floatType;
 #ifdef ORIG_TTC
 #include <ttc_c.h>
 #endif
+#ifdef RELEASE_HPTT
+#include <hptc/hptc.h>
+#endif
 
 template<typename floatType>
-floatType getZeroThreashold();
+static floatType getZeroThreashold();
 template<>
 double getZeroThreashold<double>() { return 1e-16;}
 template<>
@@ -39,7 +42,7 @@ int equal_(const floatType *A, const floatType*B, int total_size){
    const floatType *Atmp= A;
    const floatType *Btmp= B;
    for(int i=0;i < total_size ; ++i){
-      if( Atmp[i] != Atmp[i] || Btmp[i] != Btmp[i]  || isinf(Atmp[i]) || isinf(Btmp[i]) ){
+      if( Atmp[i] != Atmp[i] || Btmp[i] != Btmp[i]  || std::isinf(Atmp[i]) || std::isinf(Btmp[i]) ){
          error += 1; //test for NaN or Inf
          continue;
       }
@@ -113,9 +116,13 @@ int main(int argc, char *argv[])
   ret += posix_memalign((void**) &B, 64, sizeof(floatType) * total_size);
   ret += posix_memalign((void**) &A, 64, sizeof(floatType) * total_size);
   ret += posix_memalign((void**) &B_ref, 64, sizeof(floatType) * total_size);
+#ifdef ORIG_TTC
   ret += posix_memalign((void**) &B_orig, 64, sizeof(floatType) * total_size);
+#endif
   ret += posix_memalign((void**) &B_proto, 64, sizeof(floatType) * total_size);
+#ifdef RELEASE_HPTT
   ret += posix_memalign((void**) &B_hptt, 64, sizeof(floatType) * total_size);
+#endif
   if( ret ){
      printf("ALLOC ERROR\n");
      exit(-1);
@@ -128,9 +135,13 @@ int main(int argc, char *argv[])
 #pragma omp parallel for
   for(int i=0;i < total_size ; ++i){
      B[i] = (((i+1)*17 % 1000) - 500.) / 1000.;
+#ifdef ORIG_TTC
      B_orig[i] = B[i];
+#endif
      B_ref[i]  = B[i];
+#ifdef RELEASE_HPTT
      B_hptt[i] = B[i];
+#endif
      B_proto[i] = B[i];
   }
 
@@ -151,9 +162,7 @@ int main(int argc, char *argv[])
      //library warm-up
      auto plan2 = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
 
-//     for(int par = 0; par < 20; par++){
      hptt::Transpose<floatType> transpose( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads);
-//     transpose.setParallelStrategy(par);
      transpose.createPlan();
 
      double minTime = 1e200;
@@ -167,7 +176,6 @@ int main(int argc, char *argv[])
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }
      printf("HPTT (proto) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
-//     }
   }
 
   { // reference

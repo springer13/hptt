@@ -6,18 +6,21 @@
 #include <iostream>
 #include <cmath>
 
+#include <omp.h>
 #include <float.h>
 #include <stdio.h>
 #include <assert.h>
 
+#include "hptt.h"
+#include "hptt_utils.h"
+
 #ifdef HPTT_ARCH_AVX
 #include <immintrin.h>
 #endif
+#ifdef HPTT_ARCH_ARM
+#include <arm_neon.h>
+#endif
 
-#include <omp.h>
-
-#include "hptt.h"
-#include "hptt_utils.h"
 
 //#define HPTT_TIMERS
 
@@ -29,17 +32,10 @@
 
 namespace hptt {
 
-template<typename floatType>
-static INLINE void prefetch(const floatType* A, const int lda)
-{
-   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
-   for(int i=0;i < blocking_micro_; ++i)
-      _mm_prefetch((char*)(A + i * lda), _MM_HINT_T2);
-}
 
 
 template<typename floatType>
-floatType getZeroThreashold();
+static floatType getZeroThreashold();
 template<>
 double getZeroThreashold<double>() { return 1e-16;}
 template<>
@@ -74,6 +70,13 @@ static void streamingStore( floatType* out, const floatType *in )
 
 
 #ifdef HPTT_ARCH_AVX
+template<typename floatType>
+static INLINE void prefetch(const floatType* A, const int lda)
+{
+   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
+   for(int i=0;i < blocking_micro_; ++i)
+      _mm_prefetch((char*)(A + i * lda), _MM_HINT_T2);
+}
 template <int betaIsZero>
 struct micro_kernel<double, betaIsZero>
 {
@@ -82,10 +85,10 @@ struct micro_kernel<double, betaIsZero>
        __m256d reg_alpha = _mm256_set1_pd(alpha); // do not alter the content of B
        __m256d reg_beta = _mm256_set1_pd(beta); // do not alter the content of B
        //Load A
-       __m256d rowA0 = _mm256_load_pd((A + 0 +0*lda));
-       __m256d rowA1 = _mm256_load_pd((A + 0 +1*lda));
-       __m256d rowA2 = _mm256_load_pd((A + 0 +2*lda));
-       __m256d rowA3 = _mm256_load_pd((A + 0 +3*lda));
+       __m256d rowA0 = _mm256_load_pd((A +0*lda));
+       __m256d rowA1 = _mm256_load_pd((A +1*lda));
+       __m256d rowA2 = _mm256_load_pd((A +2*lda));
+       __m256d rowA3 = _mm256_load_pd((A +3*lda));
 
        //4x4 transpose micro kernel
        __m256d r4, r34, r3, r33;
@@ -107,26 +110,26 @@ struct micro_kernel<double, betaIsZero>
        //Load B
        if( !betaIsZero )
        {
-          __m256d rowB0 = _mm256_load_pd((B + 0 +0*ldb));
-          __m256d rowB1 = _mm256_load_pd((B + 0 +1*ldb));
-          __m256d rowB2 = _mm256_load_pd((B + 0 +2*ldb));
-          __m256d rowB3 = _mm256_load_pd((B + 0 +3*ldb));
+          __m256d rowB0 = _mm256_load_pd((B +0*ldb));
+          __m256d rowB1 = _mm256_load_pd((B +1*ldb));
+          __m256d rowB2 = _mm256_load_pd((B +2*ldb));
+          __m256d rowB3 = _mm256_load_pd((B +3*ldb));
 
           rowB0 = _mm256_add_pd( _mm256_mul_pd(rowB0, reg_beta), rowA0);
           rowB1 = _mm256_add_pd( _mm256_mul_pd(rowB1, reg_beta), rowA1);
           rowB2 = _mm256_add_pd( _mm256_mul_pd(rowB2, reg_beta), rowA2);
           rowB3 = _mm256_add_pd( _mm256_mul_pd(rowB3, reg_beta), rowA3);
           //Store B
-          _mm256_store_pd((B + 0 + 0 * ldb), rowB0);
-          _mm256_store_pd((B + 0 + 1 * ldb), rowB1);
-          _mm256_store_pd((B + 0 + 2 * ldb), rowB2);
-          _mm256_store_pd((B + 0 + 3 * ldb), rowB3);
+          _mm256_store_pd((B + 0 * ldb), rowB0);
+          _mm256_store_pd((B + 1 * ldb), rowB1);
+          _mm256_store_pd((B + 2 * ldb), rowB2);
+          _mm256_store_pd((B + 3 * ldb), rowB3);
        } else {
           //Store B
-          _mm256_store_pd((B + 0 + 0 * ldb), rowA0);
-          _mm256_store_pd((B + 0 + 1 * ldb), rowA1);
-          _mm256_store_pd((B + 0 + 2 * ldb), rowA2);
-          _mm256_store_pd((B + 0 + 3 * ldb), rowA3);
+          _mm256_store_pd((B + 0 * ldb), rowA0);
+          _mm256_store_pd((B + 1 * ldb), rowA1);
+          _mm256_store_pd((B + 2 * ldb), rowA2);
+          _mm256_store_pd((B + 3 * ldb), rowA3);
        }
     }
 };
@@ -235,6 +238,66 @@ template<>
 void streamingStore<double>( double* out, const double*in ){
    _mm256_stream_pd(out, _mm256_load_pd(in));
 }
+#else
+template<typename floatType>
+static INLINE void prefetch(const floatType* A, const int lda) { }
+#endif
+
+#ifdef HPTT_ARCH_ARM
+
+template <int betaIsZero>
+struct micro_kernel<float, betaIsZero>
+{
+    static void execute(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb, const float alpha ,const float beta)
+    {
+       float32x4_t reg_alpha = vdupq_n_f32(alpha);
+       float32x4_t reg_beta = vdupq_n_f32(beta);
+
+       //Load A
+       float32x4_t rowA0 = vld1q_f32((A +0*lda));
+       float32x4_t rowA1 = vld1q_f32((A +1*lda));
+       float32x4_t rowA2 = vld1q_f32((A +2*lda));
+       float32x4_t rowA3 = vld1q_f32((A +3*lda));
+
+       //4x4 transpose micro kernel
+       float32x4x2_t t0,t1,t2,t3;
+       t0 = vuzpq_f32(rowA0, rowA2);
+       t1 = vuzpq_f32(rowA1, rowA3);
+       t2 = vtrnq_f32(t0.val[0], t1.val[0]);
+       t3 = vtrnq_f32(t0.val[1], t1.val[1]);
+
+       //Scale A
+       rowA0 = vmulq_f32(t2.val[0], reg_alpha);
+       rowA1 = vmulq_f32(t3.val[0], reg_alpha);
+       rowA2 = vmulq_f32(t2.val[1], reg_alpha);
+       rowA3 = vmulq_f32(t3.val[1], reg_alpha);
+
+       //Load B
+       if( !betaIsZero )
+       {
+          float32x4_t rowB0 = vld1q_f32((B +0*ldb));
+          float32x4_t rowB1 = vld1q_f32((B +1*ldb));
+          float32x4_t rowB2 = vld1q_f32((B +2*ldb));
+          float32x4_t rowB3 = vld1q_f32((B +3*ldb));
+
+          rowB0 = vaddq_f32( vmulq_f32(rowB0, reg_beta), rowA0);
+          rowB1 = vaddq_f32( vmulq_f32(rowB1, reg_beta), rowA1);
+          rowB2 = vaddq_f32( vmulq_f32(rowB2, reg_beta), rowA2);
+          rowB3 = vaddq_f32( vmulq_f32(rowB3, reg_beta), rowA3);
+          //Store B
+          vst1q_f32((B + 0 * ldb), rowB0);
+          vst1q_f32((B + 1 * ldb), rowB1);
+          vst1q_f32((B + 2 * ldb), rowB2);
+          vst1q_f32((B + 3 * ldb), rowB3);
+       } else {
+          //Store B
+          vst1q_f32((B + 0 * ldb), rowA0);
+          vst1q_f32((B + 1 * ldb), rowA1);
+          vst1q_f32((B + 2 * ldb), rowA2);
+          vst1q_f32((B + 3 * ldb), rowA3);
+       }
+    }
+};
 #endif
 
 
@@ -244,10 +307,14 @@ static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType
                                    floatType* __restrict__ B, const floatType* __restrict__ Bnext, const size_t ldb,
                                    const floatType alpha ,const floatType beta)
 {
-   constexpr int blocking_ = 128 / sizeof(floatType);
    constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
+   constexpr int blocking_ = blocking_micro_ * 4;
 
+#ifdef HPTT_ARCH_ARM
+   constexpr bool useStreamingStores = 0;
+#else
    bool useStreamingStores = betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0 && (ldb*sizeof(floatType))%32 == 0;
+#endif
 
    floatType *Btmp = B;
    size_t ldb_tmp = ldb;
@@ -426,8 +493,8 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
 
    const int32_t remainder = (plan->end - plan->start) % inc;
 
-   constexpr int blocking_ = 128 / sizeof(floatType);
    constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
+   constexpr int blocking_ = blocking_micro_ * 4;
 
    if( plan->next->next != nullptr ){
       // recurse
@@ -633,12 +700,19 @@ static float getBalancing(int avail, int req)
 template<typename floatType>
 float Transpose<floatType>::getLoadBalance( const std::vector<int> &parallelismStrategy ) const
 {
-   std::vector<int> availableParallelismAtLoop;
-   this->getAvailableParallelism( availableParallelismAtLoop);
    float load_balance = 1.0;
    int totalTasks = 1;
    for(int i=0; i < dim_; ++i){
-      load_balance *= getBalancing(availableParallelismAtLoop[i], parallelismStrategy[i]); 
+
+      int inc = this->getIncrement(i);
+      while(sizeA_[i] < inc)
+         inc /= 2;
+      int availableParallelism = (sizeA_[i] + inc - 1) / inc;
+
+      if( i == 0 || perm_[i] == 0) 
+         // account for the load-imbalancing due to blocking
+         load_balance *= getBalancing(sizeA_[i], inc); 
+      load_balance *= getBalancing(availableParallelism, parallelismStrategy[i]); 
       totalTasks *= parallelismStrategy[i];
    }
 
@@ -658,6 +732,13 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
 {
    std::vector<int> availableParallelismAtLoop;
    this->getAvailableParallelism( availableParallelismAtLoop);
+
+   // reduce the probability of parallelizing the stride-1 index
+   // if this loops would be parallelized, these two statements ensure that each
+   // thread would have at least two macro-kernels of work at this loop-level
+   availableParallelismAtLoop[0] /= 2;
+   availableParallelismAtLoop[perm_[0]] /= 4; //avoid parallelization in stride-1 B more strongly
+
    // Objectives: 1) load-balancing 
    //             2) avoid parallelizing stride-1 loops (rational: less consecutive memory accesses)
    //             3) avoid false sharing
@@ -753,6 +834,7 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
          allLoops.push_back(0);
          allLoops.push_back(perm_[0]);
          parallelize( strat1, avail1, totalTasks1, primes1, 0., allLoops);
+         std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
 
       }else{
          parallelize( strat1, avail1, totalTasks1, primes1, 0.0, loopsAllowed);

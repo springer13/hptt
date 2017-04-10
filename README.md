@@ -10,6 +10,8 @@ The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on
 * Auto-tuning (akin to FFTW)
     * Loop order
     * Parallelization
+* Multi architecture support
+    * Explicitly vectorized kernels for (AVX and ARM)
 
 Keep in mind that this is an early prototype; a fully functional version will be
 available shortly.
@@ -21,7 +23,13 @@ Clone the repository into a desired directory and change to that location:
 
     git clone https://github.com/springer13/hptt.git
     cd hptt
-    make
+    export CXX=<desired compiler>
+
+Now you have several options to build the desired version of the library:
+
+    make avx
+    make arm
+    make scalar
 
 This should create 'libhptt.so' insdide the ./lib folder.
 
