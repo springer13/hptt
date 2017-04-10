@@ -9,6 +9,16 @@
 
 #include "hptt_utils.h"
 
+#define HPTT_ARCH_AVX
+//#define HPTT_ARCH_ARM
+
+#define REGISTER_BITS 256 // AVX
+
+#ifdef HPTT_ARCH_ARM
+#undef REGISTER_BITS 
+#define REGISTER_BITS 128 // ARM
+#endif
+
 namespace hptt {
 
 #ifdef DEBUG
@@ -194,10 +204,10 @@ class Transpose{
       Plan *masterPlan_; 
       SelectionMethod selectionMethod_;
       static constexpr int blocking_ = 128 / sizeof(floatType);
-      static constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
+      static constexpr int blocking_micro_ = REGISTER_BITS / 8 / sizeof(floatType);
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
 
-      static constexpr int infoLevel_ = 0; // determines which auxiliary messages should be printed
+      static constexpr int infoLevel_ = 1; // determines which auxiliary messages should be printed
 };
 
 void trashCache(double *A, double *B, int n);

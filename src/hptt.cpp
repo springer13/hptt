@@ -9,7 +9,10 @@
 #include <float.h>
 #include <stdio.h>
 #include <assert.h>
+
+#ifdef HPTT_ARCH_AVX
 #include <immintrin.h>
+#endif
 
 #include <omp.h>
 
@@ -29,15 +32,48 @@ namespace hptt {
 template<typename floatType>
 static INLINE void prefetch(const floatType* A, const int lda)
 {
-   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
+   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
    for(int i=0;i < blocking_micro_; ++i)
       _mm_prefetch((char*)(A + i * lda), _MM_HINT_T2);
 }
 
 
-template <typename floatType, int betaIsZero>
-struct micro_kernel{};
+template<typename floatType>
+floatType getZeroThreashold();
+template<>
+double getZeroThreashold<double>() { return 1e-16;}
+template<>
+float getZeroThreashold<float>() { return 1e-6;}
 
+
+template <typename floatType, int betaIsZero>
+struct micro_kernel
+{
+    static void execute(const floatType* __restrict__ A, const size_t lda, floatType* __restrict__ B, const size_t ldb, const floatType alpha, const floatType beta)
+    {
+       constexpr int n = (REGISTER_BITS/8) / sizeof(floatType);
+
+       if( std::fabs(beta) < getZeroThreashold<floatType>() )
+          for(int j=0; j < n; ++j)
+             for(int i=0; i < n; ++i)
+                B[i + j * ldb] = alpha * A[i * lda + j];
+       else
+          for(int j=0; j < n; ++j)
+             for(int i=0; i < n; ++i)
+                B[i + j * ldb] = alpha * A[i * lda + j] + beta * B[i + j * ldb];
+    }
+};
+
+template<typename floatType>
+static void streamingStore( floatType* out, const floatType *in )
+{
+   constexpr int n = REGISTER_BITS/8/sizeof(floatType);
+   for(int i=0; i < n; ++i)
+      out[i] = in[i];
+}
+
+
+#ifdef HPTT_ARCH_AVX
 template <int betaIsZero>
 struct micro_kernel<double, betaIsZero>
 {
@@ -191,10 +227,6 @@ struct micro_kernel<float, betaIsZero>
     }
 };
 
-
-template<typename floatType>
-static void streamingStore( floatType* out, const floatType *in );
-
 template<>
 void streamingStore<float>( float* out, const float*in ){
    _mm256_stream_ps(out, _mm256_load_ps(in));
@@ -203,6 +235,9 @@ template<>
 void streamingStore<double>( double* out, const double*in ){
    _mm256_stream_pd(out, _mm256_load_pd(in));
 }
+#endif
+
+
 
 template<int blockingA, int blockingB, int betaIsZero, typename floatType>
 static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
@@ -210,7 +245,7 @@ static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType
                                    const floatType alpha ,const floatType beta)
 {
    constexpr int blocking_ = 128 / sizeof(floatType);
-   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
+   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
 
    bool useStreamingStores = betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0 && (ldb*sizeof(floatType))%32 == 0;
 
@@ -392,7 +427,7 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
    const int32_t remainder = (plan->end - plan->start) % inc;
 
    constexpr int blocking_ = 128 / sizeof(floatType);
-   constexpr int blocking_micro_ = 256 / 8 / sizeof(floatType);
+   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
 
    if( plan->next->next != nullptr ){
       // recurse
@@ -473,13 +508,6 @@ void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __
       }
 }
 
-
-template<typename floatType>
-floatType getZeroThreashold();
-template<>
-double getZeroThreashold<double>() { return 1e-16;}
-template<>
-float getZeroThreashold<float>() { return 1e-6;}
 
 template<typename floatType>
 void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
@@ -809,6 +837,8 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
    }
    parallelismStrategies.emplace_back(std::vector<int>(dim_, 1));
    getBestParallelismStrategy(parallelismStrategies[0]);
+   if( this->infoLevel_ > 0 )
+      printf("Loadbalancing: %f\n", getLoadBalance(parallelismStrategies[0]));
 
    if( selectionMethod_ == ESTIMATE )
       return;
