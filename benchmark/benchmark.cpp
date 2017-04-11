@@ -160,9 +160,15 @@ int main(int argc, char *argv[])
         size_[i] = (int)size[i];
      }
      //library warm-up
-     auto plan2 = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
+     auto plan2 = hptt::create_plan( perm_, dim, 
+           alpha, A, size_, NULL, 
+           beta, B_proto, NULL, 
+           hptt::ESTIMATE, numThreads);
 
-     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads);
+     auto plan = hptt::create_plan( perm_, dim, 
+           alpha, A, size_, NULL, 
+           beta, B_proto, NULL, 
+           hptt::ESTIMATE, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){

@@ -49,12 +49,14 @@ In general HPTT is used as follows:
     int perm[dim] = {5,2,0,4,1,3};
     int size[dim] = {48,28,48,28,28};
 
-    // create a plan
-    hptt::Transpose transpose( size, perm, NULL, NULL, dim, A, alpha, B, beta, hptt::MEASURE, numThreads );
-    transpose.createPlan();
+    // create a plan (shared_ptr)
+    auto plan = hptt::create_plan( perm_, dim, 
+                                   alpha, A, size_, NULL, 
+                                   beta, B_proto, NULL, 
+                                   hptt::ESTIMATE, numThreads);
 
     // execute the transposition
-    transpose.execute();
+    plan->execute();
 
 # Requirements
 

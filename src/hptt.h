@@ -213,15 +213,9 @@ class Transpose{
 
 void trashCache(double *A, double *B, int n);
 
-std::shared_ptr<hptt::Transpose<float> > create_plan(const int *sizeA, 
-                 const int *perm, 
-                 const int *outerSizeA, 
-                 const int *outerSizeB, 
-                 const int dim,
-                 const float *A,
-                 const float alpha,
-                 float *B,
-                 const float beta,
+std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
+                 const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                 const float beta, float *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
                  const int numThreads)
 {
@@ -230,15 +224,9 @@ std::shared_ptr<hptt::Transpose<float> > create_plan(const int *sizeA,
    return plan;
 }
 
-std::shared_ptr<hptt::Transpose<double> > create_plan(const int *sizeA, 
-                 const int *perm, 
-                 const int *outerSizeA, 
-                 const int *outerSizeB, 
-                 const int dim,
-                 const double *A,
-                 const double alpha,
-                 double *B,
-                 const double beta,
+std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
+                 const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                 const double beta, double *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
                  const int numThreads )
 {
