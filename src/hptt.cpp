@@ -68,6 +68,39 @@ static void streamingStore( floatType* out, const floatType *in )
       out[i] = in[i];
 }
 
+template <typename floatType, int betaIsZero>
+struct micro_kernel_stride1
+{
+    static void execute(const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, int start, int end)
+    {
+       if( !betaIsZero )
+       {
+          for(int32_t i = start; i < end; i++)
+             B[i] = alpha * A[i] + beta * B[i];
+       } else {
+#pragma vector nontemporal
+          for(int32_t i = start; i < end; i++)
+             B[i] = alpha * A[i];
+       }
+    }
+};
+
+template<int betaIsZero, typename floatType>
+void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, const ComputeNode* plan)
+{
+   const int32_t end = plan->end - (plan->inc - 1);
+   constexpr int32_t inc = 1; // TODO
+   const size_t lda_ = plan->lda;
+   const size_t ldb_ = plan->ldb;
+
+   if( plan->next != nullptr )
+      for(int i = plan->start; i < end; i+= inc)
+         // recurse
+         sTranspose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+   else 
+      micro_kernel_stride1<floatType,betaIsZero>::execute( A, B, alpha, beta, plan->start, plan->end);
+}
+
 
 #ifdef HPTT_ARCH_AVX
 template<typename floatType>
@@ -238,6 +271,80 @@ template<>
 void streamingStore<double>( double* out, const double*in ){
    _mm256_stream_pd(out, _mm256_load_pd(in));
 }
+
+template <int betaIsZero>
+struct micro_kernel_stride1<float, betaIsZero>
+{
+   static void execute(const float* __restrict__ A, float* __restrict__ B, const float alpha, const float beta, int start, int end)
+   {
+      if( !betaIsZero )
+      {
+         int iter = start;
+         __m256 reg_alpha = _mm256_set1_ps(alpha);
+         __m256 reg_beta = _mm256_set1_ps(beta); 
+         while( iter + 32 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 0)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0))));
+            _mm256_storeu_ps( B + 8, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 8)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 8))));
+            _mm256_storeu_ps( B + 16, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 16)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 16))));
+            _mm256_storeu_ps( B + 24, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 24)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 24))));
+            iter += 32;
+            B += 32;
+            A += 32;
+         }
+         if( iter + 16 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 0)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0))));
+            _mm256_storeu_ps( B + 8, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 8)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 8))));
+            iter += 16;
+            B += 16;
+            A += 16;
+         }
+         if( iter + 8 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_add_ps( _mm256_mul_ps(reg_beta,
+                        _mm256_loadu_ps(B + 0)), _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0))));
+            iter += 8;
+            B += 8;
+            A += 8;
+         }
+
+         for(; iter < end; iter++)
+            B[iter] = alpha*A[iter] + beta*B[iter];
+      } else {
+         int iter = start;
+         __m256 reg_alpha = _mm256_set1_ps(alpha);
+         while( iter + 32 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0)));
+            _mm256_storeu_ps( B + 8, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 8)));
+            _mm256_storeu_ps( B + 16, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 16)));
+            _mm256_storeu_ps( B + 24, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 24)));
+            iter += 32;
+            B += 32;
+            A += 32;
+         }
+         if( iter + 16 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0)));
+            _mm256_storeu_ps( B + 8, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 8)));
+            iter += 16;
+            B += 16;
+            A += 16;
+         }
+         if( iter + 8 <= end){
+            _mm256_storeu_ps( B + 0, _mm256_mul_ps(reg_alpha, _mm256_loadu_ps(A + 0)));
+            iter += 8;
+            B += 8;
+            A += 8;
+         }
+
+         for(; iter < end; iter++)
+            B[iter] = alpha*A[iter] + beta*B[iter];
+      }
+   }
+};
 #else
 template<typename floatType>
 static INLINE void prefetch(const floatType* A, const int lda) { }
@@ -550,31 +657,6 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
       }
    }
 }
-
-template<int betaIsZero, typename floatType>
-void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, const ComputeNode* plan)
-{
-   const int32_t end = plan->end - (plan->inc - 1);
-   constexpr int32_t inc = 1; // TODO
-   const size_t lda_ = plan->lda;
-   const size_t ldb_ = plan->ldb;
-
-   if( plan->next != nullptr )
-      for(int i = plan->start; i < end; i+= inc)
-         // recurse
-         sTranspose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
-   else 
-      if( !betaIsZero )
-      {
-         for(int32_t i = plan->start; i < end; i+= inc)
-            B[i] = alpha * A[i] + beta * B[i];
-      } else {
-#pragma vector nontemporal
-         for(int32_t i = plan->start; i < end; i+= inc)
-            B[i] = alpha * A[i];
-      }
-}
-
 
 template<typename floatType>
 void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
