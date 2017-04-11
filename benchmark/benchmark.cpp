@@ -54,7 +54,7 @@ int equal_(const floatType *A, const floatType*B, int total_size){
       if(diff > 0){
          double relError = (diff / max);
          if(relError > 4e-5 && std::min(Aabs,Babs) > getZeroThreashold<floatType>()*5 ){
-            printf("%.3e  %.3e %.3e\n",relError, Atmp[i], Btmp[i]);
+//            fprintf(stderr,"%.3e  %.3e %.3e\n",relError, Atmp[i], Btmp[i]);
             error += 1;
          }
       }
@@ -162,8 +162,7 @@ int main(int argc, char *argv[])
      //library warm-up
      auto plan2 = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads );
 
-     hptt::Transpose<floatType> transpose( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads);
-     transpose.createPlan();
+     auto plan = hptt::create_plan( size_, perm_, NULL, NULL, dim, A, alpha, B_proto, beta, hptt::ESTIMATE, numThreads);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
@@ -171,7 +170,7 @@ int main(int argc, char *argv[])
         hptt::trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
-        transpose.execute();
+        plan->execute();
         auto elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }

@@ -139,6 +139,10 @@ class Transpose{
       floatType getBeta() const noexcept { return beta_; }
       void setAlpha(floatType alpha) noexcept { alpha_ = alpha; }
       void setBeta(floatType beta) noexcept { beta_ = beta; }
+      const floatType* getInputPtr() const noexcept { return A_; }
+      floatType* getOutputPtr() const noexcept { return B_; }
+      void setInputPtr(const floatType *A) noexcept { A_ = A; }
+      void setOutputPtr(floatType *B) noexcept { B_ = B; }
 
       /***************************************************
        * Public Methods
