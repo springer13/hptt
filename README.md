@@ -24,6 +24,7 @@ Clone the repository into a desired directory and change to that location:
     git clone https://github.com/springer13/hptt.git
     cd hptt
     export CXX=<desired compiler>
+    mkdir lib
 
 Now you have several options to build the desired version of the library:
 

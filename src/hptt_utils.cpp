@@ -15,7 +15,7 @@ void getPrimeFactors( int n, std::list<int> &primeFactors )
       }
    }
    if( primeFactors.size() <= 0 ){
-      printf("Internal error: primefactorization for %d did not work.\n", n);
+      fprintf(stderr,"Internal error: primefactorization for %d did not work.\n", n);
       exit(-1);
    }
 }
