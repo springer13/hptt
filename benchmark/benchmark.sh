@@ -1,7 +1,8 @@
 rm -f hptt_benchmark.dat
 export OMP_NUM_THREADS=24
+export GOMP_CPU_AFFINITY="0-24"
 export KMP_AFFINITY=compact,1
-for i in `seq 1 5`;
+for i in `seq 1 3`;
 do
    ./benchmark.exe 2 1 0 7264 7264 | grep GiB > tmp.dat 
    ./benchmark.exe 2 1 0 43408 1216 | grep GiB >> tmp.dat 
