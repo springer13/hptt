@@ -32,6 +32,7 @@ SRC=$(wildcard ./src/*.cpp)
 OBJ=$(SRC:.cpp=.o)
 
 all: ${OBJ}
+	mkdir -p lib
 	${CXX} ${OBJ} ${CXX_FLAGS} -o lib/libhptt.so -shared
 
 %.o: %.cpp
