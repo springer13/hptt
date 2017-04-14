@@ -24,7 +24,6 @@ Clone the repository into a desired directory and change to that location:
     git clone https://github.com/springer13/hptt.git
     cd hptt
     export CXX=<desired compiler>
-    mkdir lib
 
 Now you have several options to build the desired version of the library:
 
@@ -41,6 +40,8 @@ Please have a look at the provided benchmark.cpp.
 
 In general HPTT is used as follows:
 
+    #include <hptt.h>
+
     // allocate tensors
     float A* = ...
     float B* = ...
@@ -51,9 +52,9 @@ In general HPTT is used as follows:
     int size[dim] = {48,28,48,28,28};
 
     // create a plan (shared_ptr)
-    auto plan = hptt::create_plan( perm_, dim, 
-                                   alpha, A, size_, NULL, 
-                                   beta, B_proto, NULL, 
+    auto plan = hptt::create_plan( perm, dim, 
+                                   alpha, A, size, NULL, 
+                                   beta,  B, NULL, 
                                    hptt::ESTIMATE, numThreads);
 
     // execute the transposition
@@ -69,6 +70,24 @@ You must have a working C++ compiler with c++11 support. I have tested HPTT with
 # Benchmark
 
 The benchmark is the same as the original TTC benchmark [benchmark for tensor transpositions](https://github.com/HPAC/TTC/blob/master/benchmark/benchmark.py).
+
+You can compile the benchmark via:
+
+    cd benchmark
+    make
+
+Before running the benchmark, please modify the number of threads and the thread
+affinity within the benchmark.sh file. To run the benchmark just use:
+
+    ./benshmark.sh
+
+This will create hptt_benchmark.dat file containing all the runtime information
+of HPTT and the reference implementation.
+
+# Current Limitations
+
+* The sizes of the stride-1 indices currently needs to be a
+  multiple of the vector-width. This can be easily averted ... (TODO)
 
 
 # Citation
