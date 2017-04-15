@@ -4,7 +4,7 @@ ifeq ($(CXX),icpc)
 CXX_FLAGS += -qopenmp -xhost 
 else
 ifeq ($(CXX),g++)
-CXX_FLAGS += -fopenmp -march=native 
+CXX_FLAGS += -fopenmp -mcpu=native 
 else
 ifeq ($(CXX),clang++)
 CXX_FLAGS += -fopenmp
@@ -18,6 +18,9 @@ avx:
 arm: 
 	${MAKE} clean 
 	${MAKE} arm2
+ibm: 
+	${MAKE} clean 
+	${MAKE} ibm2
 scalar: 
 	${MAKE} clean 
 	${MAKE} scalar2
@@ -26,6 +29,8 @@ avx2:CXX_FLAGS+=-DHPTT_ARCH_AVX
 avx2: all
 arm2: CXX_FLAGS+=-mfpu=neon -DHPTT_ARCH_ARM
 arm2: all
+ibm2: CXX_FLAGS+=-mcpu=power7 -DHPTT_ARCH_IBM -maltivec -mabi=altivec
+ibm2: all
 scalar2: all
 
 SRC=$(wildcard ./src/*.cpp)

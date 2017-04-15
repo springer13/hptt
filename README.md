@@ -32,7 +32,7 @@ Now you have several options to build the desired version of the library:
     make arm
     make scalar
 
-This should create 'libhptt.so' insdide the ./lib folder.
+This should create 'libhptt.so' inside the ./lib folder.
 
 
 # Getting Started

@@ -14,13 +14,6 @@
 #include "hptt.h"
 #include "hptt_utils.h"
 
-#ifdef HPTT_ARCH_AVX
-#include <immintrin.h>
-#endif
-#ifdef HPTT_ARCH_ARM
-#include <arm_neon.h>
-#endif
-
 
 //#define HPTT_TIMERS
 
@@ -31,8 +24,6 @@
 #endif
 
 namespace hptt {
-
-
 
 template<typename floatType>
 static double getZeroThreashold();
@@ -74,6 +65,8 @@ static void streamingStore( floatType* out, const floatType *in )
 
 
 #ifdef HPTT_ARCH_AVX
+#include <immintrin.h>
+
 template<typename floatType>
 static INLINE void prefetch(const floatType* A, const int lda)
 {
@@ -248,6 +241,7 @@ static INLINE void prefetch(const floatType* A, const int lda) { }
 #endif
 
 #ifdef HPTT_ARCH_ARM
+#include <arm_neon.h>
 
 template <int betaIsZero>
 struct micro_kernel<float, betaIsZero>
@@ -302,6 +296,74 @@ struct micro_kernel<float, betaIsZero>
        }
     }
 };
+#endif
+
+#ifdef HPTT_ARCH_IBM
+//#include <altivec.h>
+//
+//template <int betaIsZero>
+//struct micro_kernel<float, betaIsZero>
+//{
+//    static void execute(const float* __restrict__ A, const size_t lda, float* __restrict__ B, const size_t ldb, const float alpha ,const float beta)
+//    {
+//       vector float reg_alpha = vec_splats(alpha);
+//
+//       //Load A
+//       vector float rowA0 = vec_ld(0,const_cast<float*>(A+0*lda));
+//       vector float rowA1 = vec_ld(0,const_cast<float*>(A+1*lda));
+//       vector float rowA2 = vec_ld(0,const_cast<float*>(A+2*lda));
+//       vector float rowA3 = vec_ld(0,const_cast<float*>(A+3*lda));
+//
+//       //4x4 transpose micro kernel
+//       vector float aa = (vector float) {2, 3, 2.5, 3.5};
+//       vector float bb = (vector float) {2.25, 3.25, 2.75, 3.75};
+//       vector float cc = (vector float) {2, 2.25, 3, 3.25};
+//       vector float dd = (vector float) {2.5, 2.75, 3.5, 3.75};
+//
+//       vector float r010 = vec_perm(rowA0,rowA1, aa); //0,4,2,6
+//       vector float r011 = vec_perm(rowA0,rowA1, bb); //1,5,3,7
+//       vector float r230 = vec_perm(rowA2,rowA3, aa); //8,12,10,14
+//       vector float r231 = vec_perm(rowA2,rowA3, bb); //9,13,11,15
+//
+//       rowA0 = vec_perm(r010, r230, cc); //0,4,8,12
+//       rowA1 = vec_perm(r011, r231, cc); //1,5,9,13
+//       rowA2 = vec_perm(r010, r230, dd); //2,6,10,14
+//       rowA3 = vec_perm(r011, r231, dd); //3,7,11,15
+//
+//       //Scale A
+//       rowA0 = vec_mul(rowA0, reg_alpha);
+//       rowA1 = vec_mul(rowA1, reg_alpha);
+//       rowA2 = vec_mul(rowA2, reg_alpha);
+//       rowA3 = vec_mul(rowA3, reg_alpha);
+//
+//       if( !betaIsZero )
+//       {
+//          vector float reg_beta = vec_splats(beta);
+//          //Load B
+//          vector float rowB0 = vec_ld(0,const_cast<float*>(B+0*ldb));
+//          vector float rowB1 = vec_ld(0,const_cast<float*>(B+1*ldb));
+//          vector float rowB2 = vec_ld(0,const_cast<float*>(B+2*ldb));
+//          vector float rowB3 = vec_ld(0,const_cast<float*>(B+3*ldb));
+//
+//          rowB0 = vec_madd( rowB0, reg_beta, rowA0);
+//          rowB1 = vec_madd( rowB1, reg_beta, rowA1);
+//          rowB2 = vec_madd( rowB2, reg_beta, rowA2);
+//          rowB3 = vec_madd( rowB3, reg_beta, rowA3);
+//
+//          //Store B
+//          vec_st(rowB0, 0, B + 0 * ldb);
+//          vec_st(rowB1, 0, B + 1 * ldb);
+//          vec_st(rowB2, 0, B + 2 * ldb);
+//          vec_st(rowB3, 0, B + 3 * ldb);
+//       } else {             
+//          //Store B         
+//          vec_st(rowA0, 0, B + 0 * ldb);
+//          vec_st(rowA1, 0, B + 1 * ldb);
+//          vec_st(rowA2, 0, B + 2 * ldb);
+//          vec_st(rowA3, 0, B + 3 * ldb);
+//       }
+//    }
+//};
 #endif
 
 
