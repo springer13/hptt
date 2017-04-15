@@ -1,23 +1,28 @@
-#include "defines.h"
+#include <string.h>
+#include <omp.h>
+#include <stdlib.h>
+#include <math.h>
 
 #include <memory>
 #include <vector>
 #include <numeric>
 #include <string>
-#include <string.h>
 #include <algorithm>
 #include <iostream>
-#include <omp.h>
-#include <stdlib.h>
-#include <math.h>
+#include <complex>
+
+#include "defines.h"
 
 template<typename floatType>
-floatType getZeroThreashold();
+static double getZeroThreashold();
 template<>
 double getZeroThreashold<double>() { return 1e-16;}
 template<>
-float getZeroThreashold<float>() { return 1e-6;}
-
+double getZeroThreashold<DoubleComplex>() { return 1e-16;}
+template<>
+double getZeroThreashold<float>() { return 1e-6;}
+template<>
+double getZeroThreashold<FloatComplex>() { return 1e-6;}
 
 
 void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __restrict__ A, floatType alpha, floatType* __restrict__ B, floatType beta)
@@ -57,7 +62,7 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __
 
       uint32_t strideAinner = strideA[perm[0]];
 
-      if( std::fabs(beta) < getZeroThreashold<floatType>() )
+      if( std::abs(beta) < getZeroThreashold<floatType>() )
          for(int i=0; i < sizeInner; ++i)
             B_[i] = alpha * A_[i * strideAinner];
       else

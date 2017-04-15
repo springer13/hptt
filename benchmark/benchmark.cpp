@@ -12,49 +12,40 @@
 #include <stdlib.h>
 #include <math.h>
 #include <cmath>
+#include <complex>
 
 #include "../src/hptt.h"
 
-
-
-typedef float floatType;
-//typedef double floatType;
-
-//#define ORIG_TTC
-//#define RELEASE_HPTT
-#ifdef ORIG_TTC
-#include <ttc_c.h>
-#endif
-#ifdef RELEASE_HPTT
-#include <hptc/hptc.h>
-#endif
+#include "defines.h"
 
 template<typename floatType>
-static floatType getZeroThreashold();
+static double getZeroThreashold();
 template<>
 double getZeroThreashold<double>() { return 1e-16;}
 template<>
-float getZeroThreashold<float>() { return 1e-6;}
+double getZeroThreashold<DoubleComplex>() { return 1e-16;}
+template<>
+double getZeroThreashold<float>() { return 1e-6;}
+template<>
+double getZeroThreashold<FloatComplex>() { return 1e-6;}
 
 
 int equal_(const floatType *A, const floatType*B, int total_size){
   int error = 0;
-   const floatType *Atmp= A;
-   const floatType *Btmp= B;
    for(int i=0;i < total_size ; ++i){
-      if( Atmp[i] != Atmp[i] || Btmp[i] != Btmp[i]  || std::isinf(Atmp[i]) || std::isinf(Btmp[i]) ){
+      if( A[i] != A[i] || B[i] != B[i]  || std::isinf(std::abs(A[i])) || std::isinf(std::abs(B[i])) ){
          error += 1; //test for NaN or Inf
          continue;
       }
-      double Aabs = (Atmp[i] < 0) ? -Atmp[i] : Atmp[i];
-      double Babs = (Btmp[i] < 0) ? -Btmp[i] : Btmp[i];
-      double max = (Aabs < Babs) ? Babs : Aabs;
-      double diff = (Aabs - Babs);
+      double Aabs = std::abs(A[i]);
+      double Babs = std::abs(B[i]);
+      double max = std::max(Aabs, Babs);
+      double diff = Aabs - Babs;
       diff = (diff < 0) ? -diff : diff;
       if(diff > 0){
-         double relError = (diff / max);
+         double relError = diff / max;
          if(relError > 4e-5 && std::min(Aabs,Babs) > getZeroThreashold<floatType>()*5 ){
-//            fprintf(stderr,"%.3e  %.3e %.3e\n",relError, Atmp[i], Btmp[i]);
+//            fprintf(stderr,"%.3e  %.3e %.3e\n",relError, A[i], B[i]);
             error += 1;
          }
       }
@@ -199,74 +190,6 @@ int main(int argc, char *argv[])
   // Verification
   if( !equal_(B_ref, B_proto, total_size) )
      fprintf(stderr, "error in ttc_proto\n");
-
-#ifdef ORIG_TTC
-  { // original ttc
-     // Create handle
-     ttc_handler_s *ttc_handle = ttc_init();
-
-     // Create transpose parameter
-     ttc_param_s param = { .alpha.s = alpha, .beta.s = beta, .lda = NULL, .ldb = NULL, .perm = perm, .size = size, .loop_perm = NULL, .dim = dim};
-
-     // Set TTC options (THIS IS OPTIONAL)
-     int maxImplemenations = 100;
-     ttc_set_opt( ttc_handle, TTC_OPT_MAX_IMPL, (void*)&maxImplemenations, 1 );
-     ttc_set_opt( ttc_handle, TTC_OPT_NUM_THREADS, (void*)&numThreads, 1 );
-     char affinity[] = "compact,1";
-     ttc_set_opt( ttc_handle, TTC_OPT_AFFINITY, (void*)affinity, strlen(affinity) );
-
-     double minTime = 1e200;
-     for(int i=0;i < nRepeat ; ++i){
-        restore(B, B_orig, total_size);
-        hptt::trashCache(trash1, trash2, largerThanL3);
-        auto begin_time = omp_get_wtime();
-        // Execute transpose
-        ttc_transpose(ttc_handle, &param, A, B_orig);
-        double elapsed_time = omp_get_wtime() - begin_time;
-        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
-     }
-     printf("TTC (orig) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
-     //verify
-     if( !equal_(B_orig, B_ref, total_size) )
-        fprintf(stderr, "error in reference\n");
-  }
-#endif
-
-#ifdef RELEASE_HPTT
-  { // RELEASE HPTT
-     std::vector<uint32_t> perm_;
-     for(int i=0;i < dim; ++i)
-        perm_.push_back(perm[i]);
-     std::vector<uint32_t> size_;
-     for(int i=0;i < dim; ++i)
-        size_.push_back(size[i]);
-
-     hptc::DeducedFloatType<floatType> alpha_ = alpha;
-     hptc::DeducedFloatType<floatType> beta_ = beta;
-     double timeout = 10;
-     double minTime = 1e200;
-     auto plan = hptc::create_trans_plan<floatType>(A, B_hptt,
-            size_, perm_,
-            alpha_, beta_, 
-            numThreads, timeout);
-
-     for(int i=0;i < nRepeat ; ++i){
-        restore(B, B_hptt, total_size);
-        hptt::trashCache(trash1, trash2, largerThanL3);
-        auto begin_time = omp_get_wtime();
-        if (nullptr != plan)
-           plan->exec();
-        else
-           printf("ERROR\n");
-        auto elapsed_time = omp_get_wtime() - begin_time;
-        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
-     }
-     printf("HPTT (release) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
-     // verify 
-     if( !equal_(B_ref, B_hptt, total_size) )
-        fprintf(stderr, "error in ttc_hptt\n");
-  }
-#endif   
 
   return 0;
 }

@@ -1,4 +1,4 @@
-CXX_FLAGS=-O3 -std=c++14
+CXX_FLAGS=-O3 -std=c++11
 
 ifeq ($(CXX),icpc)
 CXX_FLAGS += -qopenmp -xhost 

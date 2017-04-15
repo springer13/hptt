@@ -12,6 +12,7 @@ The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on
     * Parallelization
 * Multi architecture support
     * Explicitly vectorized kernels for (AVX and ARM)
+* Support float, double, complex and double complex data types
 
 Keep in mind that this is an early prototype; a fully functional version will be
 available shortly.
@@ -89,6 +90,11 @@ of HPTT and the reference implementation.
 * The sizes of the stride-1 indices currently needs to be a
   multiple of the vector-width. This can be easily averted ... (TODO)
 
+# TODOs
+
+* Add scalar remainder function in order to handle all sizes
+* Add explicit vectorization for IBM power
+* Add explicit vectorization for complex types
 
 # Citation
 

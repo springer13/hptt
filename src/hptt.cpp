@@ -35,11 +35,15 @@ namespace hptt {
 
 
 template<typename floatType>
-static floatType getZeroThreashold();
+static double getZeroThreashold();
 template<>
 double getZeroThreashold<double>() { return 1e-16;}
 template<>
-float getZeroThreashold<float>() { return 1e-6;}
+double getZeroThreashold<DoubleComplex>() { return 1e-16;}
+template<>
+double getZeroThreashold<float>() { return 1e-6;}
+template<>
+double getZeroThreashold<FloatComplex>() { return 1e-6;}
 
 
 template <typename floatType, int betaIsZero>
@@ -49,7 +53,7 @@ struct micro_kernel
     {
        constexpr int n = (REGISTER_BITS/8) / sizeof(floatType);
 
-       if( std::fabs(beta) < getZeroThreashold<floatType>() )
+       if( std::abs(beta) < getZeroThreashold<floatType>() )
           for(int j=0; j < n; ++j)
              for(int i=0; i < n; ++i)
                 B[i + j * ldb] = alpha * A[i * lda + j];
@@ -589,14 +593,14 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
-         if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
+         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
             sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
          } else {
             sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
-         if( std::fabs(beta_) < getZeroThreashold<floatType>() ) {
+         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
             sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
          }else{
             sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
@@ -617,14 +621,14 @@ void Transpose<floatType>::execute() noexcept
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( std::fabs(beta_) < 1e-17 ) {
+         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
             sTranspose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
          } else {
             sTranspose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
          }
       } else {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( std::fabs(beta_) < 1e-17 ) {
+         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
             sTranspose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
          } else {
             sTranspose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
@@ -1490,6 +1494,8 @@ Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
 
 template class Transpose<float>;
 template class Transpose<double>;
+template class Transpose<FloatComplex>;
+template class Transpose<DoubleComplex>;
 
 }
 
