@@ -98,18 +98,18 @@ of HPTT and the reference implementation.
 
 # Citation
 
-In case you want refer to TTC as part of a research paper, please cite the following
-article [(pdf)](http://arxiv.org/abs/1603.02297):
+In case you want refer to HPTT as part of a research paper, please cite the following
+article [(pdf)](https://arxiv.org/abs/1704.04374):
 ```
 @article{ttc2016a,
-   author      = {Paul Springer and Jeff R. Hammond and Paolo Bientinesi},
-   title       = {{TTC}: TTC: A high-performance Compiler for Tensor Transpositions},
+   author      = {Paul Springer and Tong Su and Paolo Bientinesi},
+   title       = {{HPTT}: A High-Performance Tensor Transposition C++ Library},
    archivePrefix = "arXiv",
-   eprint = {1603.02297},
+   eprint = {1704.04374},
    primaryClass = "quant-ph",
    journal     = {CoRR},
-   year        = {2016},
-   issue_date  = {March 2016},
-   url         = {http://arxiv.org/abs/1603.02297}
+   year        = {2017},
+   issue_date  = {April 2017},
+   url         = {https://arxiv.org/abs/1704.04374}
 }
 ``` 
