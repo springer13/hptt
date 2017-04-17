@@ -1,6 +1,6 @@
 # High-Performance Tensor Transpose library #
 
-The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on the [Tensor Transpose Compiler (TTC)](https://github.com/HPAC/TTC).
+The High-Performance Tensor Transpose (hptt) C++ library is based on the [Tensor Transpose Compiler (TTC)](https://github.com/HPAC/TTC).
 
 
 # Key Features
@@ -13,9 +13,6 @@ The High-Performance Tensor Transpose (hptt) C++ library is a prototype based on
 * Multi architecture support
     * Explicitly vectorized kernels for (AVX and ARM)
 * Support float, double, complex and double complex data types
-
-Keep in mind that this is an early prototype; a fully functional version will be
-available shortly.
 
 
 # Install
