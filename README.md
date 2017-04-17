@@ -82,6 +82,12 @@ affinity within the benchmark.sh file. To run the benchmark just use:
 This will create hptt_benchmark.dat file containing all the runtime information
 of HPTT and the reference implementation.
 
+# Performance Results
+
+![hptt](https://github.com/springer13/hptt/blob/master/benchmark/bw.png)
+
+See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
+
 # Current Limitations
 
 * The sizes of the stride-1 indices currently needs to be a
