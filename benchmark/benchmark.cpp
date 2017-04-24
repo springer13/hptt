@@ -1,4 +1,6 @@
-// include header
+/**
+ * @author: Paul Springer (springer@aices.rwth-aachen.de)
+ */
 
 
 #include <memory>

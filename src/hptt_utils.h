@@ -1,3 +1,7 @@
+/**
+ * @author: Paul Springer (springer@aices.rwth-aachen.de)
+ */
+
 #ifndef HPTT_UTILS_H
 #define HPTT_UTILS_H
 

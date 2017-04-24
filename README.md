@@ -14,7 +14,6 @@ The High-Performance Tensor Transpose (hptt) C++ library is based on the [Tensor
     * Explicitly vectorized kernels for (AVX and ARM)
 * Support float, double, complex and double complex data types
 
-
 # Install
 
 Clone the repository into a desired directory and change to that location:
@@ -92,6 +91,11 @@ See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
 
 * Add explicit vectorization for IBM power
 * Add explicit vectorization for complex types
+
+# License
+
+This project is under GPLv3 for now. If this license is too restrictive for you,
+please feel free to contact me via email (springer@aices.rwth-aachen.de).
 
 # Citation
 

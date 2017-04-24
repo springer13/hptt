@@ -1,3 +1,7 @@
+/**
+ * @author: Paul Springer (springer@aices.rwth-aachen.de)
+ */
+
 #include <vector>
 #include <list>
 #include <stdio.h>
