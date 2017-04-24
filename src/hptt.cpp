@@ -567,7 +567,7 @@ static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType
 }
 
 template<int betaIsZero, typename floatType>
-void sTranspose_int_scalar( const floatType* __restrict__ A, int sizeStride1A, 
+void transpose_int_scalar( const floatType* __restrict__ A, int sizeStride1A, 
                                   floatType* __restrict__ B, int sizeStride1B, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end;
@@ -577,12 +577,12 @@ void sTranspose_int_scalar( const floatType* __restrict__ A, int sizeStride1A,
       // recurse
       int i = plan->start;
       if( lda_ == 1)
-         sTranspose_int_scalar<betaIsZero>( &A[i*lda_], end - plan->start, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
+         transpose_int_scalar<betaIsZero>( &A[i*lda_], end - plan->start, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
       else if( ldb_ == 1)
-         sTranspose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], end - plan->start, alpha, beta, plan->next);
+         transpose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], end - plan->start, alpha, beta, plan->next);
       else
          for(; i < end; i++)
-            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
+            transpose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
    }else{
       // macro-kernel
       const size_t lda_macro_ = plan->next->lda;
@@ -598,7 +598,7 @@ void sTranspose_int_scalar( const floatType* __restrict__ A, int sizeStride1A,
    }
 }
 template<int blockingA, int blockingB, int betaIsZero, typename floatType>
-void sTranspose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
+void transpose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
@@ -617,31 +617,31 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
-            sTranspose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], &A[(i+1)*lda_], &B[i*ldb_], &B[(i+1)*ldb_], alpha, beta, plan->next);
+            transpose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], &A[(i+1)*lda_], &B[i*ldb_], &B[(i+1)*ldb_], alpha, beta, plan->next);
          else
-            sTranspose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
       }
       // remainder
       if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
          if( lda_ == 1)
-            sTranspose_int<blocking_/2, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blocking_/2, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else if( ldb_ == 1)
-            sTranspose_int<blockingA, blocking_/2, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blockingA, blocking_/2, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/2;
       }
       if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
          if( lda_ == 1)
-            sTranspose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else if( ldb_ == 1)
-            sTranspose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/4;
       }
       const size_t scalarRemainder = plan->end - i;
       if( scalarRemainder > 0 ){
          if( lda_ == 1)
-            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], scalarRemainder, &B[i*ldb_], -1, alpha, beta, plan->next);
+            transpose_int_scalar<betaIsZero>( &A[i*lda_], scalarRemainder, &B[i*ldb_], -1, alpha, beta, plan->next);
          else
-            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], -1, &B[i*ldb_], scalarRemainder, alpha, beta, plan->next);
+            transpose_int_scalar<betaIsZero>( &A[i*lda_], -1, &B[i*ldb_], scalarRemainder, alpha, beta, plan->next);
       }
    } else {
       const size_t lda_macro_ = plan->next->lda;
@@ -680,7 +680,7 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
 }
 
 template<int betaIsZero, typename floatType>
-void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, const ComputeNode* plan)
+void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
    constexpr int32_t inc = 1; // TODO
@@ -690,7 +690,7 @@ void sTranspose_int_constStride1( const floatType* __restrict__ A, floatType* __
    if( plan->next != nullptr )
       for(int i = plan->start; i < end; i+= inc)
          // recurse
-         sTranspose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         transpose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
    else 
       if( !betaIsZero )
       {
@@ -718,16 +718,16 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            sTranspose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+            transpose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
          } else {
-            sTranspose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
+            transpose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode );
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            sTranspose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
+            transpose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode);
          }else{
-            sTranspose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
+            transpose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode);
          }
       }
 }
@@ -746,16 +746,16 @@ void Transpose<floatType>::execute() noexcept
       if ( perm_[0] != 0 ) {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            sTranspose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+            transpose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
          } else {
-            sTranspose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
+            transpose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode );
          }
       } else {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            sTranspose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
+            transpose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode);
          } else {
-            sTranspose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
+            transpose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode);
          }
       }
 }
