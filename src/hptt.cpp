@@ -44,7 +44,7 @@ struct micro_kernel
     {
        constexpr int n = (REGISTER_BITS/8) / sizeof(floatType);
 
-       if( std::abs(beta) < getZeroThreashold<floatType>() )
+       if( betaIsZero )
           for(int j=0; j < n; ++j)
              for(int i=0; i < n; ++i)
                 B[i + j * ldb] = alpha * A[i * lda + j];
@@ -367,6 +367,24 @@ struct micro_kernel<float, betaIsZero>
 #endif
 
 
+template<int betaIsZero, typename floatType>
+static INLINE void macro_kernel_scalar(const floatType* __restrict__ A, const size_t lda, int blockingA,  
+                                             floatType* __restrict__ B, const size_t ldb, int blockingB,
+                                             const floatType alpha ,const floatType beta)
+{
+#ifdef DEBUG
+   assert( blockingA > 0 && blockingB > 0);
+#endif
+
+   if( betaIsZero )
+      for(int j=0; j < blockingA; ++j)
+         for(int i=0; i < blockingB; ++i)
+            B[i + j * ldb] = alpha * A[i * lda + j];
+   else
+      for(int j=0; j < blockingA; ++j)
+         for(int i=0; i < blockingB; ++i)
+            B[i + j * ldb] = alpha * A[i * lda + j] + beta * B[i + j * ldb];
+}
 
 template<int blockingA, int blockingB, int betaIsZero, typename floatType>
 static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
@@ -548,6 +566,37 @@ static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType
       }
 }
 
+template<int betaIsZero, typename floatType>
+void sTranspose_int_scalar( const floatType* __restrict__ A, int sizeStride1A, 
+                                  floatType* __restrict__ B, int sizeStride1B, const floatType alpha, const floatType beta, const ComputeNode* plan)
+{
+   const int32_t end = plan->end;
+   const size_t lda_ = plan->lda;
+   const size_t ldb_ = plan->ldb;
+   if( plan->next->next != nullptr ){
+      // recurse
+      int i = plan->start;
+      if( lda_ == 1)
+         sTranspose_int_scalar<betaIsZero>( &A[i*lda_], end - plan->start, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
+      else if( ldb_ == 1)
+         sTranspose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], end - plan->start, alpha, beta, plan->next);
+      else
+         for(; i < end; i++)
+            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
+   }else{
+      // macro-kernel
+      const size_t lda_macro_ = plan->next->lda;
+      const size_t ldb_macro_ = plan->next->ldb;
+      int i = plan->start;
+      const size_t scalarRemainder = plan->end - plan->start;
+      if( scalarRemainder > 0 ){
+         if( lda_ == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, scalarRemainder, &B[i*ldb_], ldb_macro_, sizeStride1B, alpha, beta);
+         else if( ldb_ == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, sizeStride1A, &B[i*ldb_], ldb_macro_, scalarRemainder, alpha, beta);
+      }
+   }
+}
 template<int blockingA, int blockingB, int betaIsZero, typename floatType>
 void sTranspose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, const ComputeNode* plan)
@@ -587,7 +636,13 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
             sTranspose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/4;
       }
-
+      const size_t scalarRemainder = plan->end - i;
+      if( scalarRemainder > 0 ){
+         if( lda_ == 1)
+            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], scalarRemainder, &B[i*ldb_], -1, alpha, beta, plan->next);
+         else
+            sTranspose_int_scalar<betaIsZero>( &A[i*lda_], -1, &B[i*ldb_], scalarRemainder, alpha, beta, plan->next);
+      }
    } else {
       const size_t lda_macro_ = plan->next->lda;
       const size_t ldb_macro_ = plan->next->ldb;
@@ -613,6 +668,13 @@ void sTranspose_int( const floatType* __restrict__ A, const floatType* __restric
          else if( ldb_ == 1)
             macro_kernel<blockingA, blocking_/4, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          i+=blocking_/4;
+      }
+      const size_t scalarRemainder = plan->end - i;
+      if( scalarRemainder > 0 ){
+         if( lda_ == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, scalarRemainder, &B[i*ldb_], ldb_macro_, blockingB, alpha, beta);
+         else if( ldb_ == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, blockingA, &B[i*ldb_], ldb_macro_, scalarRemainder, alpha, beta);
       }
    }
 }
@@ -1379,11 +1441,6 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 #ifdef HPTT_TIMERS
    printf("There exists %d loop orders. Time: %f ms\n",loopOrders.size(), (omp_get_wtime()-loopOrdersTime)*1000);
 #endif
-
-   if( perm_[0] != 0 && ( sizeA_[0] % (blocking_/4) != 0 || sizeA_[perm_[0]] % (blocking_/4) != 0 ) ) {
-      fprintf(stderr, "Error/TODO: add scalar remainder\n");
-      exit(-1);
-   }
 
    if( selectedParallelStrategyId_ != -1 ){
       int selectedParallelStrategyId = std::min((int)parallelismStrategies.size()-1, selectedParallelStrategyId_);

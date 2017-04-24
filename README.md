@@ -88,14 +88,8 @@ of HPTT and the reference implementation.
 
 See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
 
-# Current Limitations
-
-* The sizes of the stride-1 indices currently needs to be a
-  multiple of the vector-width. This can be easily averted ... (TODO)
-
 # TODOs
 
-* Add scalar remainder function in order to handle all sizes
 * Add explicit vectorization for IBM power
 * Add explicit vectorization for complex types
 
