@@ -102,7 +102,7 @@ please feel free to contact me via email (springer@aices.rwth-aachen.de).
 In case you want refer to HPTT as part of a research paper, please cite the following
 article [(pdf)](https://arxiv.org/abs/1704.04374):
 ```
-@article{ttc2016a,
+@article{springer2017a,
    author      = {Paul Springer and Tong Su and Paolo Bientinesi},
    title       = {{HPTT}: A High-Performance Tensor Transposition C++ Library},
    archivePrefix = "arXiv",
