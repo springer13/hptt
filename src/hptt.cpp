@@ -714,7 +714,7 @@ template<typename floatType>
 void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 {
    if( plan == nullptr ) {
-      fprintf(stderr,"ERROR: plan has not yet been created.\n");
+      fprintf(stderr,"[HPTT] ERROR: plan has not yet been created.\n");
       exit(-1);
    }
    
@@ -747,7 +747,7 @@ template<typename floatType>
 void Transpose<floatType>::execute() noexcept
 {
    if( masterPlan_ == nullptr ) {
-      fprintf(stderr,"ERROR: master plan has not yet been created.\n");
+      fprintf(stderr,"[HPTT] ERROR: master plan has not yet been created.\n");
       exit(-1);
    }
 
@@ -1120,8 +1120,8 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
 template<typename floatType>
 void Transpose<floatType>::verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const
 {
-   if ( dim < 2 ) {
-      fprintf(stderr,"ERROR: dim invalid\n");
+   if ( dim < 1 ) {
+      fprintf(stderr,"[HPTT] ERROR: dimensionality too low.\n");
       exit(-1);
    }
 
@@ -1130,7 +1130,7 @@ void Transpose<floatType>::verifyParameter(const int *size, const int* perm, con
    for(int i=0;i < dim ; ++i)
    {
       if( size[i] <= 0 ) {
-         fprintf(stderr,"ERROR: size invalid\n");
+         fprintf(stderr,"[HPTT] ERROR: size invalid\n");
          exit(-1);
       }
       found[ perm[i] ] = 1;
@@ -1138,21 +1138,21 @@ void Transpose<floatType>::verifyParameter(const int *size, const int* perm, con
 
    for(int i=0;i < dim ; ++i)
       if( found[i] <= 0 ) {
-         fprintf(stderr,"ERROR: permutation invalid\n");
+         fprintf(stderr,"[HPTT] ERROR: permutation invalid\n");
          exit(-1);
       }
 
    if ( outerSizeA != NULL )
       for(int i=0;i < dim ; ++i)
          if ( outerSizeA[i] < size[i] ) {
-            fprintf(stderr,"ERROR: outerSizeA invalid\n");
+            fprintf(stderr,"[HPTT] ERROR: outerSizeA invalid\n");
             exit(-1);
          }
 
    if ( outerSizeB != NULL )
       for(int i=0;i < dim ; ++i)
          if ( outerSizeB[i] < size[perm[i]] ) {
-            fprintf(stderr,"ERROR: outerSizeB invalid\n");
+            fprintf(stderr,"[HPTT] ERROR: outerSizeB invalid\n");
             exit(-1);
          }
 }
@@ -1210,7 +1210,7 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
             && (outerSizeA == NULL || outerSizeA == nullptr || sizeA[perm[i]] == outerSizeA[perm[i]]) 
             && (outerSizeB == NULL || outerSizeB == nullptr || sizeA[perm[i]] == outerSizeB[i]) ){ 
 #ifdef DEBUG
-         fprintf(stderr,"MERGING indices %d and %d\n",perm[i], perm[i+1]); 
+         fprintf(stderr,"[HPTT] MERGING indices %d and %d\n",perm[i], perm[i+1]); 
 #endif
          fusedIndices.emplace_back( std::make_tuple(perm_[dim_],perm[i+1]) );
          i++;
@@ -1406,7 +1406,7 @@ void Transpose<floatType>::createPlan()
    double timeStart = omp_get_wtime();
 #endif
    if( dim_ < 2 || (dim_ == 2 && perm_[0] == 0) ){
-      fprintf(stderr,"TODO: support dimension too small: map to copy()\n");
+      fprintf(stderr,"[HPTT] TODO: support dimension too small: map to copy()\n");
       exit(-1);
    }
    std::vector<Plan*> allPlans;
@@ -1578,7 +1578,7 @@ double Transpose<floatType>::getTimeLimit() const
    else if( selectionMethod_ == CRAZY )
       return 3600.; // 1h
    else{
-      fprintf(stderr,"ERROR: selectionMethod unknown.\n");
+      fprintf(stderr,"[HPTT] ERROR: selectionMethod unknown.\n");
       exit(-1);
    }
    return -1;
@@ -1588,7 +1588,7 @@ template<typename floatType>
 Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
 {
    if( plans.size() <= 0 ){
-      fprintf(stderr,"Internal error: not enough plans generated.\n");
+      fprintf(stderr,"[HPTT] Internal error: not enough plans generated.\n");
       exit(-1);
    }
    if( selectionMethod_ == ESTIMATE ) // fast return

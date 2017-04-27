@@ -19,7 +19,7 @@ void getPrimeFactors( int n, std::list<int> &primeFactors )
       }
    }
    if( primeFactors.size() <= 0 ){
-      fprintf(stderr,"Internal error: primefactorization for %d did not work.\n", n);
+      fprintf(stderr,"[HPTT] Internal error: primefactorization for %d did not work.\n", n);
       exit(-1);
    }
 }

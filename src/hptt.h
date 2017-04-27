@@ -128,7 +128,7 @@ class Transpose{
 
 #ifdef DEBUG
          if( blocking_constStride1_ != 1 )
-            fprintf(stderr, "ERROR: blocking for this case needs to be one. also look into _constStride1()\n");
+            fprintf(stderr, "[HPTT] ERROR: blocking for this case needs to be one. also look into _constStride1()\n");
 #endif
       }
 
