@@ -1615,6 +1615,50 @@ Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
    return plans[bestPlan_id];
 }
 
+std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
+                 const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                 const float beta, float *B, const int *outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads)
+{
+   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
+                 const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                 const double beta, double *B, const int *outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads )
+{
+   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
+                 const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
+                 const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads)
+{
+   auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
+                 const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
+                 const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads )
+{
+   auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   plan->createPlan();
+   return plan;
+}
+
 template class Transpose<float>;
 template class Transpose<double>;
 template class Transpose<FloatComplex>;
