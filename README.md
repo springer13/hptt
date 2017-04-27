@@ -57,6 +57,10 @@ In general HPTT is used as follows:
     // execute the transposition
     plan->execute();
 
+The example above does not use any auto-tuning, but solely relies on HPTT's
+performance model. To active auto-tuning, please use hptt::MEASURE, or
+hptt::PATIENT instead of hptt::ESTIMATE.
+
 # Requirements
 
 You must have a working C++ compiler with c++11 support. I have tested HPTT with:

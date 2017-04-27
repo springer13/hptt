@@ -51,6 +51,8 @@ class ComputeNode{
 
 class Plan{
    public:
+      Plan() : rootNodes_(nullptr), numTasks_(0) { }
+
       Plan(std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop) : rootNodes_(nullptr), loopOrder_(loopOrder), numThreadsAtLoop_(numThreadsAtLoop) {
          numTasks_ = 1;
          for(auto nt : numThreadsAtLoop)

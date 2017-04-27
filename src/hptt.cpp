@@ -724,7 +724,7 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 #endif
 
    const int numTasks = plan->getNumTasks();
-#pragma omp parallel for num_threads(numThreads_)
+#pragma omp parallel for num_threads(numThreads_)  if(numThreads_ > 1)
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
@@ -743,6 +743,53 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       }
 }
 
+template<int betaIsZero, typename floatType>
+static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int n, const floatType alpha, const floatType beta, bool useStreamingStores, int numThreads)
+{
+   if( !betaIsZero )
+   {
+#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
+      for(int32_t i = 0; i < n; i++)
+         B[i] = alpha * A[i] + beta * B[i];
+   } else {
+      if( useStreamingStores)
+#pragma vector nontemporal
+#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
+         for(int32_t i = 0; i < n; i++)
+            B[i] = alpha * A[i];
+      else
+#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
+         for(int32_t i = 0; i < n; i++)
+            B[i] = alpha * A[i];
+   }
+}
+
+template<int betaIsZero, typename floatType>
+static void axpy_2D( const floatType* __restrict__ A, const int lda, 
+                        floatType* __restrict__ B, const int ldb, 
+                        const int n0, const int n1,  const floatType alpha, const floatType beta, bool useStreamingStores, int numThreads)
+{
+   if( !betaIsZero )
+   {
+#pragma omp parallel for num_threads(numThreads) collapse(2) if(numThreads > 1)
+      for(int32_t j = 0; j < n1; j++)
+         for(int32_t i = 0; i < n0; i++)
+            B[i + j * ldb] = alpha * A[i + j * lda] + beta * B[i + j * ldb];
+   } else {
+      if( useStreamingStores)
+#pragma omp parallel for num_threads(numThreads) if(numThreads > 1) //collapse(2) (conflicts with nontemporal)
+      for(int32_t j = 0; j < n1; j++)
+#pragma vector nontemporal
+         for(int32_t i = 0; i < n0; i++)
+            B[i + j * ldb] = alpha * A[i + j * lda];
+      else
+#pragma omp parallel for num_threads(numThreads) collapse(2) if(numThreads > 1)
+         for(int32_t j = 0; j < n1; j++)
+            for(int32_t i = 0; i < n0; i++)
+               B[i + j * ldb] = alpha * A[i + j * lda];
+   }
+}
+
 template<typename floatType>
 void Transpose<floatType>::execute() noexcept
 {
@@ -755,20 +802,36 @@ void Transpose<floatType>::execute() noexcept
 #ifdef HPTT_ARCH_ARM
    useStreamingStores = 0;
 #endif
+   if( dim_ == 1)
+   {
+      if( beta_ == 0 )
+         axpy_1D<1, floatType>( A_, B_, sizeA_[0], alpha_, beta_, useStreamingStores, numThreads_ );
+      else
+         axpy_1D<0, floatType>( A_, B_, sizeA_[0], alpha_, beta_, useStreamingStores, numThreads_ );
+      return;
+   }
+   else if( dim_ == 2 && perm_[0] == 0)
+   {
+      if( beta_ == 0 )
+         axpy_2D<1, floatType>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, useStreamingStores, numThreads_ );
+      else
+         axpy_2D<0, floatType>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, useStreamingStores, numThreads_ );
+      return;
+   }
    
    const int numTasks = masterPlan_->getNumTasks();
-#pragma omp parallel for num_threads(numThreads_)
+#pragma omp parallel for num_threads(numThreads_) if(numThreads_ > 1)
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
+         if( beta_ == 0 ) {
             transpose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode, useStreamingStores );
          } else {
             transpose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode, useStreamingStores  );
          }
       } else {
          auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
+         if( beta_ == 0 ) {
             transpose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode, useStreamingStores );
          } else {
             transpose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode, useStreamingStores );
@@ -1405,10 +1468,7 @@ void Transpose<floatType>::createPlan()
 #ifdef HPTT_TIMERS
    double timeStart = omp_get_wtime();
 #endif
-   if( dim_ < 2 || (dim_ == 2 && perm_[0] == 0) ){
-      fprintf(stderr,"[HPTT] TODO: support dimension too small: map to copy()\n");
-      exit(-1);
-   }
+   
    std::vector<Plan*> allPlans;
    createPlans(allPlans);
 
@@ -1442,6 +1502,10 @@ void Transpose<floatType>::createPlan()
 template<typename floatType>
 void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 {
+   if( dim_ == 1 || (dim_ == 2 && perm_[0] == 0)) {
+      plans.emplace_back(new Plan); //create dummy plan
+      return; // handled within execute()
+   }
 #ifdef HPTT_TIMERS
    double parallelStrategiesTime = omp_get_wtime();
 #endif
@@ -1485,7 +1549,7 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
             Plan *plan = new Plan(loopOrder, numThreadsAtLoop );
             const int numTasks = plan->getNumTasks();
 
-#pragma omp parallel for num_threads(numThreads_)
+#pragma omp parallel for num_threads(numThreads_) if(numThreads_ > 1)
             for( int taskId = 0; taskId < numTasks; taskId++)
             {
                ComputeNode *currentNode = plan->getRootNode(taskId);
