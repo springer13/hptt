@@ -108,7 +108,8 @@ class Transpose{
          masterPlan_(nullptr),
          blocking_constStride1_(1), //TODO
          selectionMethod_(selectionMethod),
-         selectedParallelStrategyId_(-1)
+         selectedParallelStrategyId_(-1),
+         useStreamingStores_(true)
       {
          sizeA_.resize(dim);
          perm_.resize(dim);
@@ -151,6 +152,8 @@ class Transpose{
       floatType* getOutputPtr() const noexcept { return B_; }
       void setInputPtr(const floatType *A) noexcept { A_ = A; }
       void setOutputPtr(floatType *B) noexcept { B_ = B; }
+      void setStreamingStores(bool use) noexcept { useStreamingStores_ = use; }
+      bool getStreamingStores() const noexcept { return useStreamingStores_; }
 
       /***************************************************
        * Public Methods
@@ -181,7 +184,7 @@ class Transpose{
                                         const float minBalancing,
                                         const std::vector<int> &loopsAllowed) const;
       float getLoadBalance( const std::vector<int> &parallelismStrategy ) const;
-      float estimateExecutionTime( const Plan *plan); //execute just a few iterations and exterpolate the result
+      float estimateExecutionTime( const Plan *plan); //execute just a few iterations and extrapolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getBestParallelismStrategy ( std::vector<int> &bestParallelismStrategy ) const;
       void getBestLoopOrder( std::vector<int> &loopOrder ) const;
@@ -193,7 +196,7 @@ class Transpose{
             std::vector<std::vector<int> > &parallelismStrategies) const;
       void getAvailableParallelism( std::vector<int> &numTasksPerLoop ) const;
       int getIncrement( int loopIdx ) const;
-      void executeEstimate(const Plan *plan) noexcept; // almost identical to execute, but it just executes few iterations and then exterpolates
+      void executeEstimate(const Plan *plan) noexcept; // almost identical to execute, but it just executes few iterations and then extrapolates
       double getTimeLimit() const;
 
       const floatType* __restrict__ A_;
@@ -209,6 +212,7 @@ class Transpose{
       std::vector<size_t> ldb_; 
       int numThreads_;
       int selectedParallelStrategyId_;
+      bool useStreamingStores_;
 
       Plan *masterPlan_; 
       SelectionMethod selectionMethod_;
