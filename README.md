@@ -1,7 +1,15 @@
 # High-Performance Tensor Transpose library #
 
-The High-Performance Tensor Transpose (hptt) C++ library is based on the [Tensor Transpose Compiler (TTC)](https://github.com/HPAC/TTC).
+HPTT is a high-performance C++ library for out-of-place tensor transpositions of the general form: 
 
+![hptt](https://github.com/springer13/hptt/blob/c++/misc/equation.png)
+
+where A and B respectively denote the input and output tensor;
+<img src=https://github.com/springer13/hptt/blob/c++/misc/pi.png height=16px/> represents the user-specified
+transposition, and 
+<img src=https://github.com/springer13/hptt/blob/c++/misc/alpha.png height=14px/> and
+<img src=https://github.com/springer13/hptt/blob/c++/misc/beta.png height=16px/> being scalars
+(i.e., setting <img src=https://github.com/springer13/hptt/blob/c++/misc/beta.png height=16px/> != 0 enables the user to update the output tensor B).
 
 # Key Features
 
@@ -70,7 +78,7 @@ You must have a working C++ compiler with c++11 support. I have tested HPTT with
 
 # Benchmark
 
-The benchmark is the same as the original TTC benchmark [benchmark for tensor transpositions](https://github.com/HPAC/TTC/blob/master/benchmark/benchmark.py).
+The benchmark is the same as the original TTC benchmark [benchmark for tensor transpositions](https://github.com/HPAC/TTC/blob/master/benchmark).
 
 You can compile the benchmark via:
 
