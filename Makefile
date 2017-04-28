@@ -39,6 +39,7 @@ OBJ=$(SRC:.cpp=.o)
 all: ${OBJ}
 	mkdir -p lib
 	${CXX} ${OBJ} ${CXX_FLAGS} -o lib/libhptt.so -shared
+	ar rvs lib/libhptt.a ${OBJ}
 
 %.o: %.cpp
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
