@@ -110,8 +110,7 @@ class Transpose{
          masterPlan_(nullptr),
          blocking_constStride1_(1), //TODO
          selectionMethod_(selectionMethod),
-         selectedParallelStrategyId_(-1),
-         useStreamingStores_(true)
+         selectedParallelStrategyId_(-1)
       {
          sizeA_.resize(dim);
          perm_.resize(dim);
@@ -154,14 +153,14 @@ class Transpose{
       floatType* getOutputPtr() const noexcept { return B_; }
       void setInputPtr(const floatType *A) noexcept { A_ = A; }
       void setOutputPtr(floatType *B) noexcept { B_ = B; }
-      void setStreamingStores(bool use) noexcept { useStreamingStores_ = use; }
-      bool getStreamingStores() const noexcept { return useStreamingStores_; }
 
       /***************************************************
        * Public Methods
        ***************************************************/
       void createPlan();
 
+      template<bool useStreamingStores=true, bool spawnThreads=true, bool betaIsZero>
+      void execute_expert() noexcept;
       void execute() noexcept;
 
    private:
@@ -214,7 +213,6 @@ class Transpose{
       std::vector<size_t> ldb_; 
       int numThreads_;
       int selectedParallelStrategyId_;
-      bool useStreamingStores_;
 
       Plan *masterPlan_; 
       SelectionMethod selectionMethod_;
@@ -237,7 +235,7 @@ std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const in
                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
                  const double beta, double *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads );
+                 const int numThreads);
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
@@ -249,7 +247,7 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads );
+                 const int numThreads);
 
 
 extern template class Transpose<float>;

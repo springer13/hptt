@@ -17,6 +17,7 @@
 
 #include "hptt.h"
 #include "hptt_utils.h"
+#include "macros.h"
 
 
 //#define HPTT_TIMERS
@@ -390,105 +391,105 @@ static INLINE void macro_kernel_scalar(const floatType* __restrict__ A, const si
             B[i + j * ldb] = alpha * A[i * lda + j] + beta * B[i + j * ldb];
 }
 
-template<int blockingA, int blockingB, int betaIsZero, typename floatType>
+template<int blockingA, int blockingB, int betaIsZero, typename floatType, bool useStreamingStores_>
 static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType* __restrict__ Anext, const size_t lda, 
                                    floatType* __restrict__ B, const floatType* __restrict__ Bnext, const size_t ldb,
-                                   const floatType alpha ,const floatType beta, bool useStreamingStores)
+                                   const floatType alpha ,const floatType beta)
 {
    constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
    constexpr int blocking_ = blocking_micro_ * 4;
 
-   useStreamingStores = useStreamingStores && betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0 && (ldb*sizeof(floatType))%32 == 0;
+   const bool useStreamingStores = useStreamingStores_ && betaIsZero && (blockingB*sizeof(floatType))%64 == 0 && ((uint64_t)B)%32 == 0 && (ldb*sizeof(floatType))%32 == 0;
 
    floatType *Btmp = B;
    size_t ldb_tmp = ldb;
    floatType buffer[blockingA * blockingB];// __attribute__((aligned(64)));
-   if( useStreamingStores ){
+   if( (useStreamingStores_ && useStreamingStores) ){
       Btmp = buffer;
       ldb_tmp = blockingB;
    }
 
    if( blockingA == blocking_ && blockingB == blocking_ )
    {
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
    }else if( blockingA == 2*blocking_micro_ && blockingB == blocking_ ) {
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       prefetch<floatType>(Anext + (2*blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (3*blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (2*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 2*blocking_micro_), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (3*blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 3*blocking_micro_), ldb_tmp  , alpha , beta);
    }else if( blockingA == blocking_ && blockingB == 2*blocking_micro_) {
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (0 * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 0), lda, Btmp + (0 * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 0), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 0), lda, Btmp + (0 * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + blocking_micro_), lda, Btmp + (blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       prefetch<floatType>(Anext + (0 * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       prefetch<floatType>(Anext + (blocking_micro_ * lda + 2*blocking_micro_), lda);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 2*blocking_micro_), lda, Btmp + (2*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
-      if( !useStreamingStores )
+      if( !(useStreamingStores_ && useStreamingStores) )
          prefetch<floatType>(Bnext + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp);
       micro_kernel<floatType,betaIsZero>::execute(A + (0 * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + 0), ldb_tmp  , alpha , beta);
       micro_kernel<floatType,betaIsZero>::execute(A + (blocking_micro_ * lda + 3*blocking_micro_), lda, Btmp + (3*blocking_micro_ * ldb_tmp + blocking_micro_), ldb_tmp  , alpha , beta);
@@ -559,7 +560,7 @@ static INLINE void macro_kernel(const floatType* __restrict__ A, const floatType
    }
 
    // write buffer to main-memory via non-temporal stores
-   if( useStreamingStores )
+   if( (useStreamingStores_ && useStreamingStores) )
       for( int i = 0; i < blockingA; i++){
          for( int j = 0; j < blockingB; j+=blocking_micro_)
             streamingStore<floatType>(B + i * ldb + j, buffer + i * ldb_tmp + j);
@@ -597,10 +598,10 @@ void transpose_int_scalar( const floatType* __restrict__ A, int sizeStride1A,
       }
    }
 }
-template<int blockingA, int blockingB, int betaIsZero, typename floatType>
+template<int blockingA, int blockingB, int betaIsZero, typename floatType, bool useStreamingStores>
 void transpose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, 
-                     const ComputeNode* plan, bool useStreamingStores)
+                     const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
    const int32_t inc = plan->inc;
@@ -618,23 +619,23 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
-            transpose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], &A[(i+1)*lda_], &B[i*ldb_], &B[(i+1)*ldb_], alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], &A[(i+1)*lda_], &B[i*ldb_], &B[(i+1)*ldb_], alpha, beta, plan->next);
          else
-            transpose_int<blockingA, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
       }
       // remainder
       if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
          if( lda_ == 1)
-            transpose_int<blocking_/2, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blocking_/2, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else if( ldb_ == 1)
-            transpose_int<blockingA, blocking_/2, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blockingA, blocking_/2, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/2;
       }
       if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
          if( lda_ == 1)
-            transpose_int<blocking_/4, blockingB, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blocking_/4, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          else if( ldb_ == 1)
-            transpose_int<blockingA, blocking_/4, betaIsZero>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next, useStreamingStores);
+            transpose_int<blockingA, blocking_/4, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
          i+=blocking_/4;
       }
       const size_t scalarRemainder = plan->end - i;
@@ -652,22 +653,22 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
       int32_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
-            macro_kernel<blockingA, blockingB, betaIsZero,floatType>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta);
          else
-            macro_kernel<blockingA, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
       // remainder
       if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
          if( lda_ == 1)
-            macro_kernel<blocking_/2, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blocking_/2, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          else if( ldb_ == 1)
-            macro_kernel<blockingA, blocking_/2, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blockingA, blocking_/2, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          i+=blocking_/2;
       }
       if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
          if( lda_ == 1)
-            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          else if( ldb_ == 1)
-            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta, useStreamingStores);
+            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
          i+=blocking_/4;
       }
       const size_t scalarRemainder = plan->end - i;
@@ -680,9 +681,9 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
    }
 }
 
-template<int betaIsZero, typename floatType>
+template<int betaIsZero, typename floatType, bool useStreamingStores>
 void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __restrict__ B, const floatType alpha, const floatType beta, 
-      const ComputeNode* plan, bool useStreamingStores)
+      const ComputeNode* plan)
 {
    const int32_t end = plan->end - (plan->inc - 1);
    constexpr int32_t inc = 1; // TODO
@@ -692,7 +693,7 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
    if( plan->next != nullptr )
       for(int i = plan->start; i < end; i+= inc)
          // recurse
-         transpose_int_constStride1<betaIsZero>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next, useStreamingStores);
+         transpose_int_constStride1<betaIsZero, floatType, useStreamingStores>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
    else 
       if( !betaIsZero )
       {
@@ -718,10 +719,7 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       exit(-1);
    }
    
-   bool useStreamingStores = useStreamingStores_;
-#ifdef HPTT_ARCH_ARM
-   useStreamingStores = 0;
-#endif
+   constexpr bool useStreamingStores = false;
 
    const int numTasks = plan->getNumTasks();
 #pragma omp parallel for num_threads(numThreads_)  if(numThreads_ > 1)
@@ -729,68 +727,107 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            transpose_int<blocking_,blocking_,1,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode, useStreamingStores  );
+            transpose_int<blocking_,blocking_,1,floatType, useStreamingStores>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
          } else {
-            transpose_int<blocking_,blocking_,0,floatType>( A_,A_, B_, B_, 0.0, 1.0, rootNode, useStreamingStores  );
+            transpose_int<blocking_,blocking_,0,floatType, useStreamingStores>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
-            transpose_int_constStride1<1,floatType>( A_, B_, 0.0, 1.0, rootNode, useStreamingStores );
+            transpose_int_constStride1<1,floatType, useStreamingStores>( A_, B_, 0.0, 1.0, rootNode);
          }else{
-            transpose_int_constStride1<0,floatType>( A_, B_, 0.0, 1.0, rootNode, useStreamingStores );
+            transpose_int_constStride1<0,floatType, useStreamingStores>( A_, B_, 0.0, 1.0, rootNode);
          }
       }
 }
 
-template<int betaIsZero, typename floatType>
-static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int n, const floatType alpha, const floatType beta, bool useStreamingStores, int numThreads)
+template<int betaIsZero, typename floatType, bool useStreamingStores, bool spawnThreads>
+static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int n, const floatType alpha, const floatType beta, int numThreads)
 {
    if( !betaIsZero )
    {
-#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
-      for(int32_t i = 0; i < n; i++)
-         B[i] = alpha * A[i] + beta * B[i];
+      HPTT_DUPLICATE(spawnThreads,
+         for(int32_t i = 0; i < n; i++)
+            B[i] = alpha * A[i] + beta * B[i];
+      )
    } else {
       if( useStreamingStores)
 #pragma vector nontemporal
-#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
-         for(int32_t i = 0; i < n; i++)
-            B[i] = alpha * A[i];
+         HPTT_DUPLICATE(spawnThreads,
+            for(int32_t i = 0; i < n; i++)
+               B[i] = alpha * A[i];
+         )
       else
-#pragma omp parallel for num_threads(numThreads) if(numThreads > 1)
-         for(int32_t i = 0; i < n; i++)
-            B[i] = alpha * A[i];
+         HPTT_DUPLICATE(spawnThreads,
+            for(int32_t i = 0; i < n; i++)
+               B[i] = alpha * A[i];
+         )
    }
 }
 
-template<int betaIsZero, typename floatType>
+template<int betaIsZero, typename floatType, bool useStreamingStores, bool spawnThreads>
 static void axpy_2D( const floatType* __restrict__ A, const int lda, 
                         floatType* __restrict__ B, const int ldb, 
-                        const int n0, const int n1,  const floatType alpha, const floatType beta, bool useStreamingStores, int numThreads)
+                        const int n0, const int n1,  const floatType alpha, const floatType beta, int numThreads)
 {
    if( !betaIsZero )
    {
-#pragma omp parallel for num_threads(numThreads) collapse(2) if(numThreads > 1)
-      for(int32_t j = 0; j < n1; j++)
-         for(int32_t i = 0; i < n0; i++)
-            B[i + j * ldb] = alpha * A[i + j * lda] + beta * B[i + j * ldb];
-   } else {
-      if( useStreamingStores)
-#pragma omp parallel for num_threads(numThreads) if(numThreads > 1) //collapse(2) (conflicts with nontemporal)
-      for(int32_t j = 0; j < n1; j++)
-#pragma vector nontemporal
-         for(int32_t i = 0; i < n0; i++)
-            B[i + j * ldb] = alpha * A[i + j * lda];
-      else
-#pragma omp parallel for num_threads(numThreads) collapse(2) if(numThreads > 1)
+      HPTT_DUPLICATE_2(spawnThreads,
          for(int32_t j = 0; j < n1; j++)
             for(int32_t i = 0; i < n0; i++)
+               B[i + j * ldb] = alpha * A[i + j * lda] + beta * B[i + j * ldb];
+      )
+   } else {
+      if( useStreamingStores)
+         HPTT_DUPLICATE(spawnThreads,
+            for(int32_t j = 0; j < n1; j++)
+#pragma vector nontemporal
+            for(int32_t i = 0; i < n0; i++)
                B[i + j * ldb] = alpha * A[i + j * lda];
+         )
+      else
+         HPTT_DUPLICATE_2(spawnThreads,
+            for(int32_t j = 0; j < n1; j++)
+               for(int32_t i = 0; i < n0; i++)
+                  B[i + j * ldb] = alpha * A[i + j * lda];
+         )
    }
 }
 
-template<typename floatType>
+template<typename floatType> 
+template<bool useStreamingStores, bool spawnThreads, bool betaIsZero>
+void Transpose<floatType>::execute_expert() noexcept
+{
+   if( masterPlan_ == nullptr ) {
+      fprintf(stderr,"[HPTT] ERROR: master plan has not yet been created.\n");
+      exit(-1);
+   }
+
+   if( dim_ == 1)
+   {
+      axpy_1D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, B_, sizeA_[0], alpha_, beta_, numThreads_ );
+      return;
+   }
+   else if( dim_ == 2 && perm_[0] == 0)
+   {
+      axpy_2D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, numThreads_ );
+      return;
+   }
+   
+   const int numTasks = masterPlan_->getNumTasks();
+   const int numThreads = numThreads_;
+   HPTT_DUPLICATE(spawnThreads,
+      for( int taskId = 0; taskId < numTasks; taskId++)
+         if ( perm_[0] != 0 ) {
+            auto rootNode = masterPlan_->getRootNode_const( taskId );
+            transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores>( A_, A_, B_, B_, alpha_, beta_, rootNode);
+         } else {
+            auto rootNode = masterPlan_->getRootNode_const( taskId );
+            transpose_int_constStride1<betaIsZero,floatType, useStreamingStores>( A_, B_, alpha_, beta_, rootNode);
+         }
+   )
+}
+template<typename floatType> 
 void Transpose<floatType>::execute() noexcept
 {
    if( masterPlan_ == nullptr ) {
@@ -798,45 +835,23 @@ void Transpose<floatType>::execute() noexcept
       exit(-1);
    }
 
-   bool useStreamingStores = useStreamingStores_;
-#ifdef HPTT_ARCH_ARM
-   useStreamingStores = 0;
-#endif
-   if( dim_ == 1)
+   bool spawnThreads = numThreads_ > 1;
+   bool betaIsZero = beta_ == 0;
+   constexpr bool useStreamingStores = true;
+   if( spawnThreads )
    {
-      if( beta_ == 0 )
-         axpy_1D<1, floatType>( A_, B_, sizeA_[0], alpha_, beta_, useStreamingStores, numThreads_ );
-      else
-         axpy_1D<0, floatType>( A_, B_, sizeA_[0], alpha_, beta_, useStreamingStores, numThreads_ );
-      return;
-   }
-   else if( dim_ == 2 && perm_[0] == 0)
-   {
-      if( beta_ == 0 )
-         axpy_2D<1, floatType>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, useStreamingStores, numThreads_ );
-      else
-         axpy_2D<0, floatType>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, useStreamingStores, numThreads_ );
-      return;
-   }
-   
-   const int numTasks = masterPlan_->getNumTasks();
-#pragma omp parallel for num_threads(numThreads_) if(numThreads_ > 1)
-   for( int taskId = 0; taskId < numTasks; taskId++)
-      if ( perm_[0] != 0 ) {
-         auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( beta_ == 0 ) {
-            transpose_int<blocking_,blocking_,1,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode, useStreamingStores );
-         } else {
-            transpose_int<blocking_,blocking_,0,floatType>( A_, A_, B_, B_, alpha_, beta_, rootNode, useStreamingStores  );
-         }
+      if( betaIsZero) {
+         this->execute_expert<useStreamingStores, true, true>();
       } else {
-         auto rootNode = masterPlan_->getRootNode_const( taskId );
-         if( beta_ == 0 ) {
-            transpose_int_constStride1<1,floatType>( A_, B_, alpha_, beta_, rootNode, useStreamingStores );
-         } else {
-            transpose_int_constStride1<0,floatType>( A_, B_, alpha_, beta_, rootNode, useStreamingStores );
-         }
+         this->execute_expert<useStreamingStores, true, false>();
       }
+   } else {
+      if( betaIsZero) {
+         this->execute_expert<useStreamingStores, false, true>();
+      } else {
+         this->execute_expert<useStreamingStores, false, false>();
+      }
+   }
 }
 
 template<typename floatType>
@@ -1703,10 +1718,10 @@ std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int
 }
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
-                 const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
-                 const double beta, double *B, const int *outerSizeB, 
-                 const SelectionMethod selectionMethod,
-                 const int numThreads )
+      const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+      const double beta, double *B, const int *outerSizeB, 
+      const SelectionMethod selectionMethod,
+      const int numThreads)
 {
    auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
    plan->createPlan();
@@ -1714,10 +1729,10 @@ std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const in
 }
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
-                 const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
-                 const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
-                 const SelectionMethod selectionMethod,
-                 const int numThreads)
+      const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
+      const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
+      const SelectionMethod selectionMethod,
+      const int numThreads)
 {
    auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
    plan->createPlan();
@@ -1725,20 +1740,55 @@ std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, co
 }
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
-                 const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
-                 const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
-                 const SelectionMethod selectionMethod,
-                 const int numThreads )
+      const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
+      const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
+      const SelectionMethod selectionMethod,
+      const int numThreads)
 {
    auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
    plan->createPlan();
    return plan;
 }
 
+template void Transpose<float>::execute_expert<true, true, true>();
+template void Transpose<float>::execute_expert<true, false, true>();
+template void Transpose<float>::execute_expert<false, true, true>();
+template void Transpose<float>::execute_expert<false, false, true>();
+template void Transpose<float>::execute_expert<true, true, false>();
+template void Transpose<float>::execute_expert<true, false, false>();
+template void Transpose<float>::execute_expert<false, true, false>();
+template void Transpose<float>::execute_expert<false, false, false>();
 template class Transpose<float>;
+
 template class Transpose<double>;
+template void Transpose<double>::execute_expert<true,true, true>();
+template void Transpose<double>::execute_expert<false,true, true>();
+template void Transpose<double>::execute_expert<true,false, true>();
+template void Transpose<double>::execute_expert<false,false, true>();
+template void Transpose<double>::execute_expert<true,true, false>();
+template void Transpose<double>::execute_expert<false,true, false>();
+template void Transpose<double>::execute_expert<true,false, false>();
+template void Transpose<double>::execute_expert<false,false, false>();
+
 template class Transpose<FloatComplex>;
+template void Transpose<FloatComplex>::execute_expert<true,true, true>();
+template void Transpose<FloatComplex>::execute_expert<false,true, true>();
+template void Transpose<FloatComplex>::execute_expert<true,false, true>();
+template void Transpose<FloatComplex>::execute_expert<false,false, true>();
+template void Transpose<FloatComplex>::execute_expert<true,true, false>();
+template void Transpose<FloatComplex>::execute_expert<false,true, false>();
+template void Transpose<FloatComplex>::execute_expert<true,false, false>();
+template void Transpose<FloatComplex>::execute_expert<false,false, false>();
+
 template class Transpose<DoubleComplex>;
+template void Transpose<DoubleComplex>::execute_expert<true,true, true>();
+template void Transpose<DoubleComplex>::execute_expert<false,true, true>();
+template void Transpose<DoubleComplex>::execute_expert<true,false, true>();
+template void Transpose<DoubleComplex>::execute_expert<false,false, true>();
+template void Transpose<DoubleComplex>::execute_expert<true,true, false>();
+template void Transpose<DoubleComplex>::execute_expert<false,true, false>();
+template void Transpose<DoubleComplex>::execute_expert<true,false, false>();
+template void Transpose<DoubleComplex>::execute_expert<false,false, false>();
 
 }
 
