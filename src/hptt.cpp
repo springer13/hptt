@@ -19,6 +19,7 @@
 #include "hptt_utils.h"
 #include "macros.h"
 
+#define NDEBUG
 
 //#define HPTT_TIMERS
 
@@ -1300,12 +1301,15 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
    for( auto tup : fusedIndices )
    {
       sizeA_[std::get<0>(tup)] *= sizeA[std::get<1>(tup)];
-      if( outerSizeA != NULL && outerSizeA != nullptr )
+      if( outerSizeA != NULL && outerSizeA != nullptr ){
          outerSizeA_[std::get<0>(tup)] *= outerSizeA[std::get<1>(tup)];
+         outerSizeA_[std::get<1>(tup)] = -1;
+      }
       if( outerSizeB != NULL && outerSizeB != nullptr){
          int pos1 = findPos(std::get<0>(tup), perm, dim);
          int pos2 = findPos(std::get<1>(tup), perm, dim);
          outerSizeB_[pos1] *= outerSizeB[pos2];
+         outerSizeB_[pos2] = -1;
       }
    }
 
@@ -1329,21 +1333,51 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
          sizeA_[currentValue] = sizeA_[minValue];
          currentValue++;
       }
+
+
+      // compact outer size (e.g.: outerSizeA_[] = {24,-1,5,-1,13} -> {24,5,13,-1,-1} -> {24,5,13}
+      for(int i=0;i < dim ; ++i)
+         if( outerSizeA_[i] == -1 )
+         {
+            int j=i+1;
+            for(;j < dim ; ++j)
+               if( outerSizeA_[j] != -1 )
+                  break;
+            if( j < dim )
+               std::swap(outerSizeA_[i], outerSizeA_[j]);
+         }
       outerSizeA_.resize(dim_);
+      for(int i=0;i < dim ; ++i)
+         if( outerSizeB_[i] == -1 )
+         {
+            int j=i+1;
+            for(;j < dim ; ++j)
+               if( outerSizeB_[j] != -1 )
+                  break;
+            if( j < dim )
+               std::swap(outerSizeB_[i], outerSizeB_[j]);
+         }
       outerSizeB_.resize(dim_);
       sizeA_.resize(dim_);
       perm_.resize(dim_);
 
 #ifdef DEBUG
-      printf("perm: ");
+      printf("\nperm: ");
       for(int i=0;i < dim ; ++i)
          printf("%d ",perm[i]);
-      printf("perm_new: ");
+      printf("\nperm_new: ");
       for(int i=0;i < dim_ ; ++i)
          printf("%d ",perm_[i]);
-      printf("sizes_new: ");
+      printf("\nsizes_new: ");
       for(int i=0;i < dim_ ; ++i)
          printf("%d ",sizeA_[i]);
+      printf("\nouterSizeA_new: ");
+      for(int i=0;i < dim_ ; ++i)
+         printf("%d ",outerSizeA_[i]);
+      printf("\nouterSizeB_new: ");
+      for(int i=0;i < dim_ ; ++i)
+         printf("%d ",outerSizeB_[i]);
+      printf("\n");
 #endif
    } 
 }
