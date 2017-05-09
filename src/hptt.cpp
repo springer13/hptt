@@ -609,8 +609,6 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
    const size_t lda_ = plan->lda;
    const size_t ldb_ = plan->ldb;
 
-   const int32_t remainder = (plan->end - plan->start) % inc;
-
    constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
    constexpr int blocking_ = blocking_micro_ * 4;
 
@@ -742,25 +740,37 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       }
 }
 
+static void getStartEnd(int n, int numThreads, int &myStart, int &myEnd)
+{
+   const int workPerThread = (n + numThreads-1)/numThreads;
+   const int threadId = omp_get_thread_num();
+   myStart = std::min(n, threadId * workPerThread);
+   myEnd = std::min(n, (threadId+1) * workPerThread);
+}
+
+
 template<int betaIsZero, typename floatType, bool useStreamingStores, bool spawnThreads>
 static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int n, const floatType alpha, const floatType beta, int numThreads)
 {
+   int myStart = 0;
+   int myEnd = n;
+   int numTasks = n;
    if( !betaIsZero )
    {
       HPTT_DUPLICATE(spawnThreads,
-         for(int32_t i = 0; i < n; i++)
+         for(int32_t i = myStart; i < myEnd; i++)
             B[i] = alpha * A[i] + beta * B[i];
       )
    } else {
       if( useStreamingStores)
 #pragma vector nontemporal
          HPTT_DUPLICATE(spawnThreads,
-            for(int32_t i = 0; i < n; i++)
+            for(int32_t i = myStart; i < myEnd; i++)
                B[i] = alpha * A[i];
          )
       else
          HPTT_DUPLICATE(spawnThreads,
-            for(int32_t i = 0; i < n; i++)
+            for(int32_t i = myStart; i < myEnd; i++)
                B[i] = alpha * A[i];
          )
    }
@@ -771,24 +781,27 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
                         floatType* __restrict__ B, const int ldb, 
                         const int n0, const int n1,  const floatType alpha, const floatType beta, int numThreads)
 {
+   int myStart = 0;
+   int myEnd = n1;
+   int numTasks = n1;
    if( !betaIsZero )
    {
-      HPTT_DUPLICATE_2(spawnThreads,
-         for(int32_t j = 0; j < n1; j++)
+      HPTT_DUPLICATE(spawnThreads,
+         for(int32_t j = myStart; j < myEnd; j++)
             for(int32_t i = 0; i < n0; i++)
                B[i + j * ldb] = alpha * A[i + j * lda] + beta * B[i + j * ldb];
       )
    } else {
       if( useStreamingStores)
          HPTT_DUPLICATE(spawnThreads,
-            for(int32_t j = 0; j < n1; j++)
+            for(int32_t j = myStart; j < myEnd; j++)
 #pragma vector nontemporal
             for(int32_t i = 0; i < n0; i++)
                B[i + j * ldb] = alpha * A[i + j * lda];
          )
       else
-         HPTT_DUPLICATE_2(spawnThreads,
-            for(int32_t j = 0; j < n1; j++)
+         HPTT_DUPLICATE(spawnThreads,
+            for(int32_t j = myStart; j < myEnd; j++)
                for(int32_t i = 0; i < n0; i++)
                   B[i + j * ldb] = alpha * A[i + j * lda];
          )
@@ -815,10 +828,13 @@ void Transpose<floatType>::execute_expert() noexcept
       return;
    }
    
+
    const int numTasks = masterPlan_->getNumTasks();
    const int numThreads = numThreads_;
+   int myStart = 0;
+   int myEnd = numTasks;
    HPTT_DUPLICATE(spawnThreads,
-      for( int taskId = 0; taskId < numTasks; taskId++)
+      for( int taskId = myStart; taskId < myEnd; taskId++)
          if ( perm_[0] != 0 ) {
             auto rootNode = masterPlan_->getRootNode_const( taskId );
             transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores>( A_, A_, B_, B_, alpha_, beta_, rootNode);
@@ -837,7 +853,7 @@ void Transpose<floatType>::execute() noexcept
    }
 
    bool spawnThreads = numThreads_ > 1;
-   bool betaIsZero = beta_ == 0;
+   bool betaIsZero = (beta_ == (floatType) 0.0);
    constexpr bool useStreamingStores = true;
    if( spawnThreads )
    {
@@ -1518,7 +1534,7 @@ void Transpose<floatType>::createPlan()
    double timeStart = omp_get_wtime();
 #endif
    
-   std::vector<Plan*> allPlans;
+   std::vector<std::shared_ptr<Plan> > allPlans;
    createPlans(allPlans);
 
 #ifdef HPTT_TIMERS
@@ -1532,24 +1548,11 @@ void Transpose<floatType>::createPlan()
    }
 #ifdef HPTT_TIMERS
    printf("SelectPlan() took %f ms\n",(omp_get_wtime()-timeStart)*1000);
-   timeStart = omp_get_wtime();
-#endif
-   
-   //delete all other plans
-   for( int i=0; i < allPlans.size(); i++ ){
-      if( allPlans[i] != nullptr && allPlans[i] != masterPlan_ )
-      {
-         delete allPlans[i];
-         allPlans[i] = nullptr;
-      }
-   }
-#ifdef HPTT_TIMERS
-   printf("Deleting plans took %f ms\n",(omp_get_wtime()-timeStart)*1000);
 #endif
 }
 
 template<typename floatType>
-void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
+void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &plans ) const
 {
    if( dim_ == 1 || (dim_ == 2 && perm_[0] == 0)) {
       plans.emplace_back(new Plan); //create dummy plan
@@ -1595,7 +1598,7 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
 
             auto numThreadsAtLoop = parallelismStrategies[i];
             auto loopOrder = loopOrders[j];
-            Plan *plan = new Plan(loopOrder, numThreadsAtLoop );
+            auto plan = std::make_shared<Plan>(loopOrder, numThreadsAtLoop );
             const int numTasks = plan->getNumTasks();
 
 #pragma omp parallel for num_threads(numThreads_) if(numThreads_ > 1)
@@ -1655,10 +1658,10 @@ void Transpose<floatType>::createPlans( std::vector<Plan*> &plans ) const
  * Estimates the time in seconds for the given computeTree
  */
 template<typename floatType>
-float Transpose<floatType>::estimateExecutionTime( const Plan *plan)
+float Transpose<floatType>::estimateExecutionTime( const std::shared_ptr<Plan> plan)
 {
    double startTime = omp_get_wtime();
-   this->executeEstimate(plan);
+   this->executeEstimate(plan.get());
    double elapsedTime = omp_get_wtime() - startTime;
 
    const double minMeasurementTime = 0.1; // in seconds
@@ -1669,7 +1672,7 @@ float Transpose<floatType>::estimateExecutionTime( const Plan *plan)
    //execute just a few iterations and exterpolate the result
    startTime = omp_get_wtime();
    for(int i=0;i < nRepeat ; ++i) //ATTENTION: we are not clearing the caches inbetween runs
-      this->executeEstimate( plan );
+      this->executeEstimate( plan.get() );
    elapsedTime = omp_get_wtime() - startTime;
    elapsedTime /= nRepeat;
 
@@ -1698,7 +1701,7 @@ double Transpose<floatType>::getTimeLimit() const
 }
 
 template<typename floatType>
-Plan* Transpose<floatType>::selectPlan( const std::vector<Plan*> &plans)
+std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::shared_ptr<Plan> > &plans)
 {
    if( plans.size() <= 0 ){
       fprintf(stderr,"[HPTT] Internal error: not enough plans generated.\n");

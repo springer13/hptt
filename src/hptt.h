@@ -133,11 +133,22 @@ class Transpose{
 #endif
       }
 
-      ~Transpose() { 
-         if ( masterPlan_!= nullptr ){
-            delete masterPlan_;
-         }
-      }
+      Transpose(const Transpose &other) : A_(other.A_), B_(other.B_), 
+                                          alpha_(other.alpha_),
+                                          beta_(other.beta_),
+                                          dim_(other.dim_),
+                                          numThreads_(other.numThreads_),
+                                          masterPlan_(other.masterPlan_),
+                                          selectionMethod_(other.selectionMethod_),
+                                          selectedParallelStrategyId_(other.selectedParallelStrategyId_),
+                                          sizeA_(other.sizeA_),
+                                          perm_(other.perm_),
+                                          outerSizeA_(other.outerSizeA_),
+                                          outerSizeB_(other.outerSizeB_),
+                                          lda_(other.lda_),
+                                          ldb_(other.ldb_) { }
+
+      ~Transpose() { }
 
       /***************************************************
        * Getter & Setter
@@ -167,8 +178,8 @@ class Transpose{
       /***************************************************
        * Private Methods
        ***************************************************/
-      void createPlans( std::vector<Plan*> &plans ) const;
-      Plan* selectPlan( const std::vector<Plan*> &plans );
+      void createPlans( std::vector<std::shared_ptr<Plan> > &plans ) const;
+      std::shared_ptr<Plan> selectPlan( const std::vector<std::shared_ptr<Plan> > &plans );
       void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
       void computeLeadingDimensions();
       double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
@@ -185,7 +196,7 @@ class Transpose{
                                         const float minBalancing,
                                         const std::vector<int> &loopsAllowed) const;
       float getLoadBalance( const std::vector<int> &parallelismStrategy ) const;
-      float estimateExecutionTime( const Plan *plan); //execute just a few iterations and extrapolate the result
+      float estimateExecutionTime( const std::shared_ptr<Plan> plan); //execute just a few iterations and extrapolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getBestParallelismStrategy ( std::vector<int> &bestParallelismStrategy ) const;
       void getBestLoopOrder( std::vector<int> &loopOrder ) const;
@@ -214,7 +225,7 @@ class Transpose{
       int numThreads_;
       int selectedParallelStrategyId_;
 
-      Plan *masterPlan_; 
+      std::shared_ptr<Plan> masterPlan_; 
       SelectionMethod selectionMethod_;
       static constexpr int blocking_micro_ = REGISTER_BITS / 8 / sizeof(floatType);
       static constexpr int blocking_ = blocking_micro_ * 4;
