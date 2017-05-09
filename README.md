@@ -106,7 +106,7 @@ See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
 
 # License
 
-This project is under GPLv3 for now. If this license is too restrictive for you,
+This project is under LGPLv3 for now. If this license is too restrictive for you,
 please feel free to contact me via email (springer@aices.rwth-aachen.de).
 
 # Citation
