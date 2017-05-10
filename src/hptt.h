@@ -1,5 +1,7 @@
 /**
- *   High-Performance Tensor Transposition Library
+ *   High-Performance Tensor Transposition Library for general tensor transpositions of the form:
+ *   
+ *       B_{\pi(i_0,i_1,...)} = \alpha * A_{i_0,i_1,...} + \beta * B_{\pi(i_0,i_1,...)}
  *
  *   Copyright (C) 2017  Paul Springer (springer@aices.rwth-aachen.de)
  *
@@ -24,6 +26,7 @@
 #include <vector>
 #include <memory>
 #include <complex>
+#include <algorithm>
 
 #include <stdio.h>
 
@@ -115,7 +118,8 @@ class Transpose{
                  floatType *B,
                  const floatType beta,
                  const SelectionMethod selectionMethod,
-                 const int numThreads) : 
+                 const int numThreads, 
+                 const int *threadIds = nullptr) : 
          A_(A),
          B_(B),
          alpha_(alpha),
@@ -133,6 +137,15 @@ class Transpose{
          outerSizeB_.resize(dim);
          lda_.resize(dim);
          ldb_.resize(dim);
+         if(threadIds){
+            // compact threadIds. E.g., 1, 7, 5 -> local_id(1) = 0, local_id(7) = 2, local_id(5) = 1
+            for(int i=0; i < numThreads; ++i)
+               threadIds_.push_back(threadIds[i]);
+            std::sort(threadIds_.begin(), threadIds_.end());
+         }else{
+            for(int i=0; i < numThreads; ++i)
+               threadIds_.push_back(i);
+         }
 
          verifyParameter(sizeA, perm, outerSizeA, outerSizeB, dim);
 
@@ -199,6 +212,9 @@ class Transpose{
       void computeLeadingDimensions();
       double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
       double parallelismCostHeuristic( const std::vector<int> &loopOrder ) const;
+      int getLocalThreadId(int myThreadId) const;
+      template<bool spawnThreads>
+      void getStartEnd(int n, int &myStart, int &myEnd) const;
 
       /***************************************************
        * Helper Methods
@@ -237,6 +253,7 @@ class Transpose{
       std::vector<size_t> outerSizeB_; 
       std::vector<size_t> lda_; 
       std::vector<size_t> ldb_; 
+      std::vector<int> threadIds_; 
       int numThreads_;
       int selectedParallelStrategyId_;
 
@@ -251,29 +268,38 @@ class Transpose{
 
 void trashCache(double *A, double *B, int n);
 
+/**
+ * Creates Transpose plan for a transposition of the form: B_{\pi(i_0,i_1,...)} = \alpha * A_{i_0,i_1,...} + \beta * B_{\pi(i_0,i_1,...)}. 
+ * This plan can be reused over several transpositions.
+ *
+ * \param[in] perm Permutation of the indices. For instance, perm[] = {1,0,2} dontes the following transposition: B[i1,i0,i2] = A[i0,i1,i2].
+ * \param[in] threadIds Array of OpenMP threadIds that participate in this
+ *            tensor transposition. This parameter is only important if you want to call
+ *            HPTT from within a parallel region (i.e., via execute_expert<..., spawnThreads=false, ...>().
+ */
 std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
                  const float beta, float *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads);
+                 const int numThreads, const int *threadIds = nullptr);
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
                  const double beta, double *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads);
+                 const int numThreads, const int *threadIds = nullptr);
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
                  const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads);
+                 const int numThreads, const int *threadIds = nullptr);
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads);
+                 const int numThreads, const int *threadIds = nullptr);
 
 
 extern template class Transpose<float>;

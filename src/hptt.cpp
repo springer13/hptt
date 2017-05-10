@@ -755,21 +755,11 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
       }
 }
 
-static void getStartEnd(int n, int numThreads, int &myStart, int &myEnd)
-{
-   const int workPerThread = (n + numThreads-1)/numThreads;
-   const int threadId = omp_get_thread_num();
-   myStart = std::min(n, threadId * workPerThread);
-   myEnd = std::min(n, (threadId+1) * workPerThread);
-}
 
 
 template<int betaIsZero, typename floatType, bool useStreamingStores, bool spawnThreads>
-static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int n, const floatType alpha, const floatType beta, int numThreads)
+static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B, const int myStart, const int myEnd, const floatType alpha, const floatType beta, int numThreads)
 {
-   int myStart = 0;
-   int myEnd = n;
-   int numTasks = n;
    if( !betaIsZero )
    {
       HPTT_DUPLICATE(spawnThreads,
@@ -794,11 +784,8 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
 template<int betaIsZero, typename floatType, bool useStreamingStores, bool spawnThreads>
 static void axpy_2D( const floatType* __restrict__ A, const int lda, 
                         floatType* __restrict__ B, const int ldb, 
-                        const int n0, const int n1,  const floatType alpha, const floatType beta, int numThreads)
+                        const int n0, const int myStart, const int myEnd, const floatType alpha, const floatType beta, int numThreads)
 {
-   int myStart = 0;
-   int myEnd = n1;
-   int numTasks = n1;
    if( !betaIsZero )
    {
       HPTT_DUPLICATE(spawnThreads,
@@ -824,6 +811,39 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
 }
 
 template<typename floatType> 
+template<bool spawnThreads>
+void Transpose<floatType>::getStartEnd(int n, int &myStart, int &myEnd) const
+{
+   if(spawnThreads){
+      myStart = 0;
+      myEnd = n;
+      return;
+   }
+   int myLocalThreadId = getLocalThreadId(omp_get_thread_num());
+   if(myLocalThreadId == -1 )
+   {
+      myStart = n;
+      myEnd = n;
+      return;
+   }
+
+   const int workPerThread = (n + numThreads_-1)/numThreads_;
+   myStart = std::min(n, myLocalThreadId * workPerThread);
+   myEnd = std::min(n, (myLocalThreadId+1) * workPerThread);
+}
+
+
+template<typename floatType> 
+int Transpose<floatType>::getLocalThreadId(int myThreadId) const
+{
+   int myLocalId = -1;
+   for(int i=0; i < numThreads_; ++i)
+      if(myThreadId == threadIds_[i])
+         myLocalId = i;
+   return myLocalId;
+}
+
+template<typename floatType> 
 template<bool useStreamingStores, bool spawnThreads, bool betaIsZero>
 void Transpose<floatType>::execute_expert() noexcept
 {
@@ -832,22 +852,26 @@ void Transpose<floatType>::execute_expert() noexcept
       exit(-1);
    }
 
+   int myStart = 0;
+   int myEnd = 0;
+
    if( dim_ == 1)
    {
-      axpy_1D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, B_, sizeA_[0], alpha_, beta_, numThreads_ );
+      getStartEnd<spawnThreads>(sizeA_[0], myStart, myEnd);
+      axpy_1D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, B_, myStart, myEnd, alpha_, beta_, numThreads_ );
       return;
    }
    else if( dim_ == 2 && perm_[0] == 0)
    {
-      axpy_2D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, lda_[1], B_, ldb_[1], sizeA_[0], sizeA_[1], alpha_, beta_, numThreads_ );
+      getStartEnd<spawnThreads>(sizeA_[1], myStart, myEnd);
+      axpy_2D<betaIsZero, floatType, useStreamingStores, spawnThreads>( A_, lda_[1], B_, ldb_[1], sizeA_[0], myStart, myEnd, alpha_, beta_, numThreads_ );
       return;
    }
-   
 
    const int numTasks = masterPlan_->getNumTasks();
    const int numThreads = numThreads_;
-   int myStart = 0;
-   int myEnd = numTasks;
+   getStartEnd<spawnThreads>(numTasks, myStart, myEnd);
+
    HPTT_DUPLICATE(spawnThreads,
       for( int taskId = myStart; taskId < myEnd; taskId++)
          if ( perm_[0] != 0 ) {
@@ -1759,45 +1783,45 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
 }
 
 std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
-                 const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
-                 const float beta, float *B, const int *outerSizeB, 
-                 const SelectionMethod selectionMethod,
-                 const int numThreads)
+                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                  const float beta, float *B, const int *outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const int *threadIds)
 {
-   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
+   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads, threadIds));
    plan->createPlan();
    return plan;
 }
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
-      const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
-      const double beta, double *B, const int *outerSizeB, 
-      const SelectionMethod selectionMethod,
-      const int numThreads)
+                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                  const double beta, double *B, const int *outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const int *threadIds)
 {
-   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads, threadIds ));
    plan->createPlan();
    return plan;
 }
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
-      const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
-      const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
-      const SelectionMethod selectionMethod,
-      const int numThreads)
+                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
+                  const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const int *threadIds)
 {
-   auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads));
+   auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads, threadIds));
    plan->createPlan();
    return plan;
 }
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
-      const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
-      const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
-      const SelectionMethod selectionMethod,
-      const int numThreads)
+                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
+                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const int *threadIds)
 {
-   auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads ));
+   auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, selectionMethod, numThreads, threadIds ));
    plan->createPlan();
    return plan;
 }
