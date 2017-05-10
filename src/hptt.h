@@ -27,6 +27,7 @@
 #include <memory>
 #include <complex>
 #include <algorithm>
+#include <omp.h>
 
 #include <stdio.h>
 
@@ -131,6 +132,7 @@ class Transpose{
          selectionMethod_(selectionMethod),
          selectedParallelStrategyId_(-1)
       {
+         omp_init_lock(&writelock);
          sizeA_.resize(dim);
          perm_.resize(dim);
          outerSizeA_.resize(dim);
@@ -174,9 +176,13 @@ class Transpose{
                                           outerSizeA_(other.outerSizeA_),
                                           outerSizeB_(other.outerSizeB_),
                                           lda_(other.lda_),
-                                          ldb_(other.ldb_) { }
+                                          ldb_(other.ldb_),
+                                          threadIds_(other.threadIds_) 
+      { 
+         omp_init_lock(&writelock);
+      }
 
-      ~Transpose() { }
+      ~Transpose() { omp_destroy_lock(&writelock); }
 
       /***************************************************
        * Getter & Setter
@@ -192,6 +198,15 @@ class Transpose{
       floatType* getOutputPtr() const noexcept { return B_; }
       void setInputPtr(const floatType *A) noexcept { A_ = A; }
       void setOutputPtr(floatType *B) noexcept { B_ = B; }
+      void resetThreadIds() noexcept { threadIds_.clear(); }
+      void printThreadIds() const noexcept { for( auto id : threadIds_) printf("%d, ",id); printf("\n"); } 
+      int getMasterThreadId() const noexcept { return threadIds_[0]; } 
+      void addThreadId(int threadId) noexcept { 
+         omp_set_lock(&writelock);
+         threadIds_.push_back(threadId); 
+         std::sort(threadIds_.begin(), threadIds_.end()); 
+         omp_unset_lock(&writelock);
+      }
 
       /***************************************************
        * Public Methods
@@ -256,6 +271,7 @@ class Transpose{
       std::vector<int> threadIds_; 
       int numThreads_;
       int selectedParallelStrategyId_;
+      omp_lock_t writelock;
 
       std::shared_ptr<Plan> masterPlan_; 
       SelectionMethod selectionMethod_;
