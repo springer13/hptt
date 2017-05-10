@@ -814,15 +814,15 @@ template<typename floatType>
 template<bool spawnThreads>
 void Transpose<floatType>::getStartEnd(int n, int &myStart, int &myEnd) const
 {
-   if(spawnThreads){
-      myStart = 0;
+   int myLocalThreadId = getLocalThreadId(omp_get_thread_num());
+   if(myLocalThreadId == -1 ) // skip those threads which do not participate in this plan
+   {
+      myStart = n;
       myEnd = n;
       return;
    }
-   int myLocalThreadId = getLocalThreadId(omp_get_thread_num());
-   if(myLocalThreadId == -1 )
-   {
-      myStart = n;
+   if(spawnThreads){ // worksharing will be handled by the OpenMP runtime
+      myStart = 0;
       myEnd = n;
       return;
    }
