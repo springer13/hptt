@@ -11,14 +11,19 @@
 #include <algorithm>
 #include <iostream>
 #include <omp.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdlib>
 #include <cmath>
 #include <complex>
 
 #include "../src/hptt.h"
 
 #include "defines.h"
+
+//#define ORIG_TTC
+
+#ifdef ORIG_TTC
+#include <ttc_c.h>
+#endif
 
 template<typename floatType>
 static double getZeroThreashold();
@@ -113,9 +118,6 @@ int main(int argc, char *argv[])
   ret += posix_memalign((void**) &B_orig, 64, sizeof(floatType) * total_size);
 #endif
   ret += posix_memalign((void**) &B_proto, 64, sizeof(floatType) * total_size);
-#ifdef RELEASE_HPTT
-  ret += posix_memalign((void**) &B_hptt, 64, sizeof(floatType) * total_size);
-#endif
   if( ret ){
      printf("ALLOC ERROR\n");
      exit(-1);
@@ -132,9 +134,6 @@ int main(int argc, char *argv[])
      B_orig[i] = B[i];
 #endif
      B_ref[i]  = B[i];
-#ifdef RELEASE_HPTT
-     B_hptt[i] = B[i];
-#endif
      B_proto[i] = B[i];
   }
 
@@ -145,7 +144,7 @@ int main(int argc, char *argv[])
      trash2[i] = ((i+1)*13)%10000;
   }
   
-  {  //hptt prototype
+  {  //hptt 
      int perm_[dim];
      int size_[dim];
      for(int i=0;i < dim ; ++i){
@@ -188,10 +187,41 @@ int main(int argc, char *argv[])
      }
      printf("TTC (ref) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(floatType)*total_size*3/1024./1024./1024 / minTime);
   }
-
   // Verification
   if( !equal_(B_ref, B_proto, total_size) )
      fprintf(stderr, "error in ttc_proto\n");
+
+
+#ifdef ORIG_TTC
+  // Create handle
+  ttc_handler_s *ttc_handle = ttc_init();
+
+  // Create transpose parameter
+  ttc_param_s param = { .alpha.s = alpha, .beta.s = beta, .lda = NULL, .ldb = NULL, .perm = perm, .size = size, .loop_perm = NULL, .dim = dim};
+
+  // Set TTC options (THIS IS OPTIONAL)
+  int maxImplemenations = 100;
+  ttc_set_opt( ttc_handle, TTC_OPT_MAX_IMPL, (void*)&maxImplemenations, 1 );
+  ttc_set_opt( ttc_handle, TTC_OPT_NUM_THREADS, (void*)&numThreads, 1 );
+  char affinity[] = "compact,1";
+  ttc_set_opt( ttc_handle, TTC_OPT_AFFINITY, (void*)affinity, strlen(affinity) );
+
+  { // original ttc
+     double minTime = 1e200;
+     for(int i=0;i < nRepeat ; ++i){
+        restore(B, B_orig, total_size);
+        hptt::trashCache(trash1, trash2, largerThanL3);
+        auto begin_time = omp_get_wtime();
+        // Execute transpose
+        ttc_transpose(ttc_handle, &param, A, B_orig);
+        double elapsed_time = omp_get_wtime() - begin_time;
+        minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
+     }
+     printf("TTC (orig) %d %s %s: %.2f ms. %.2f GiB/s\n", dim, perm_str.c_str(), size_str.c_str(), minTime*1000, sizeof(float)*total_size*3/1024./1024./1024 / minTime);
+  }
+  if( !equal_(B_ref, B_orig, total_size) )
+     fprintf(stderr, "error in ttc_orig\n");
+#endif
 
   return 0;
 }
