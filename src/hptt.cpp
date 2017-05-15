@@ -22,6 +22,7 @@
 #include <vector>
 #include <list>
 #include <algorithm>
+#include <numeric>
 #include <iostream>
 #include <cmath>
 
@@ -972,7 +973,7 @@ void Transpose<floatType>::getAllParallelismStrategies( std::list<int> &primeFac
 // e.g., balancing(3,4) = 0.75
 static float getBalancing(int avail, int req)
 {
-   return (float)(avail)/(((avail+req-1)/req)*req);
+   return ((float)(avail))/(((avail+req-1)/req)*req);
 }
 
 template<typename floatType>
@@ -1010,12 +1011,28 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
 {
    std::vector<int> availableParallelismAtLoop;
    this->getAvailableParallelism( availableParallelismAtLoop);
+   int totalAvailableParallelism = std::accumulate(availableParallelismAtLoop.begin(), 
+                                 availableParallelismAtLoop.end(), 1, std::multiplies<int>());
 
    // reduce the probability of parallelizing the stride-1 index
    // if this loops would be parallelized, these two statements ensure that each
    // thread would have at least two macro-kernels of work at this loop-level
-   availableParallelismAtLoop[0] /= 2;
-   availableParallelismAtLoop[perm_[0]] /= 4; //avoid parallelization in stride-1 B more strongly
+   //
+   // However, if the total available parallelism is too small, then we do not
+   // artificially limit the available parallelism further
+   int reduceParallelismB = 4; //avoid parallelization in stride-1 B more strongly
+   int reduceParallelismA = 2;
+   if( totalAvailableParallelism < 2 * numThreads_ )
+      reduceParallelismB = 1;
+   else if( totalAvailableParallelism < 4 * numThreads_ )
+      reduceParallelismB = 2;
+   totalAvailableParallelism = (totalAvailableParallelism / availableParallelismAtLoop[perm_[0]]) * 
+                                (availableParallelismAtLoop[perm_[0]]/reduceParallelismB);
+   if( totalAvailableParallelism < 2 * numThreads_ )
+      reduceParallelismA = 1;
+   availableParallelismAtLoop[perm_[0]] = std::max(1, availableParallelismAtLoop[perm_[0]] 
+                                                   / reduceParallelismB ); 
+   availableParallelismAtLoop[0] = std::max(1, availableParallelismAtLoop[0] / reduceParallelismA );
 
    // Objectives: 1) load-balancing 
    //             2) avoid parallelizing stride-1 loops (rational: less consecutive memory accesses)
