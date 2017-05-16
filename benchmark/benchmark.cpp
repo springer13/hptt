@@ -18,6 +18,8 @@
 #include "../src/hptt.h"
 
 #include "defines.h"
+#include "reference.h"
+typedef float floatType;
 
 //#define ORIG_TTC
 
@@ -37,6 +39,7 @@ template<>
 double getZeroThreashold<FloatComplex>() { return 1e-6;}
 
 
+template<typename floatType>
 int equal_(const floatType *A, const floatType*B, int total_size){
   int error = 0;
    for(int i=0;i < total_size ; ++i){
@@ -60,14 +63,12 @@ int equal_(const floatType *A, const floatType*B, int total_size){
    return (error == 0) ? 1 : 0;
 }
 
+template<typename floatType>
 void restore(const floatType* A, floatType* B, size_t n)
 {
    for(size_t i=0;i < n ; ++i)
       B[i] = A[i];
 }
-
-void transpose_ref( uint32_t *size, uint32_t *perm, int dim, const floatType* __restrict__ A, floatType alpha, floatType* __restrict__ B, floatType beta);
-
 
 int main(int argc, char *argv[]) 
 {

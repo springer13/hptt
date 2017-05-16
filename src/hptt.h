@@ -152,7 +152,8 @@ class Transpose{
          verifyParameter(sizeA, perm, outerSizeA, outerSizeB, dim);
 
          // initializes dim_, outerSizeA, outerSizeB, sizeA and perm 
-         fuseIndices(sizeA, perm, outerSizeA, outerSizeB, dim);
+         skipIndices(sizeA, perm, outerSizeA, outerSizeB, dim);
+         fuseIndices();
 
          // initializes lda_ and ldb_
          computeLeadingDimensions();
@@ -223,7 +224,8 @@ class Transpose{
        ***************************************************/
       void createPlans( std::vector<std::shared_ptr<Plan> > &plans ) const;
       std::shared_ptr<Plan> selectPlan( const std::vector<std::shared_ptr<Plan> > &plans );
-      void fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim);
+      void fuseIndices();
+      void skipIndices(const int *_sizeA, const int* _perm, const int *_outerSizeA, const int *_outerSizeB, const int dim);
       void computeLeadingDimensions();
       double loopCostHeuristic( const std::vector<int> &loopOrder ) const;
       double parallelismCostHeuristic( const std::vector<int> &loopOrder ) const;

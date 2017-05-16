@@ -1328,6 +1328,111 @@ void Transpose<floatType>::computeLeadingDimensions()
          ldb_[i] = outerSizeB_[i-1] * ldb_[i-1];
 }
 
+template<typename floatType>
+void Transpose<floatType>::skipIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim)
+{
+   for(int i=0;i < dim ; ++i)
+   {
+      perm_[i] = perm[i];
+      sizeA_[i] = sizeA[i];
+      if(outerSizeA)
+         outerSizeA_[i] = outerSizeA[i];
+      else
+         outerSizeA_[i] = sizeA[i];
+      if(outerSizeB)
+         outerSizeB_[i] = outerSizeB[i];
+      else
+         outerSizeB_[i] = sizeA[perm[i]];
+   }
+
+   int skipped = 0;
+   for(int i=0;i < dim ; ++i)
+   {
+      int idxB = 0;
+      for(;idxB < dim ; ++idxB)
+         if(perm[idxB] == i)
+            break;
+      if( sizeA[i] == 1 && (!outerSizeA || outerSizeA[i] == 1) && (!outerSizeB || outerSizeB[idxB] == 1) )
+      {
+         sizeA_[i] = -1;
+         outerSizeA_[i] = -1;
+         outerSizeB_[idxB] = -1;
+         perm_[idxB] = -1;
+         skipped++;
+      }
+   }
+   // compact arrays (remove -1)
+   for(int i=0;i < dim ; ++i)
+      if( sizeA_[i] == -1 )
+      {
+         int j=i+1;
+         for(;j < dim ; ++j)
+            if( sizeA_[j] != -1 )
+               break;
+         if( j < dim )
+            std::swap(sizeA_[i], sizeA_[j]);
+      }
+   for(int i=0;i < dim ; ++i)
+      if( outerSizeA_[i] == -1 )
+      {
+         int j=i+1;
+         for(;j < dim ; ++j)
+            if( outerSizeA_[j] != -1 )
+               break;
+         if( j < dim )
+            std::swap(outerSizeA_[i], outerSizeA_[j]);
+      }
+   for(int i=0;i < dim ; ++i)
+      if( outerSizeB_[i] == -1 )
+      {
+         int j=i+1;
+         for(;j < dim ; ++j)
+            if( outerSizeB_[j] != -1 )
+               break;
+         if( j < dim )
+            std::swap(outerSizeB_[i], outerSizeB_[j]);
+      }
+   for(int i=0;i < dim ; ++i)
+      if( perm_[i] == -1 )
+      {
+         int j=i+1;
+         for(;j < dim ; ++j)
+            if( perm_[j] != -1 )
+               break;
+         if( j < dim )
+            std::swap(perm_[i], perm_[j]);
+      }
+
+   dim_ = dim - skipped;
+   perm_.resize(dim_);
+   sizeA_.resize(dim_);
+   outerSizeA_.resize(dim_);
+   outerSizeB_.resize(dim_);
+
+   // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
+   int currentValue = 0;
+   for(int i=0;i < dim_; ++i){
+      //find smallest element in perm_ and rename it to currentValue
+      int minValue = 1000000;
+      int minPos = -1;
+      for(int pos=0; pos < dim_; ++pos){
+         if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
+            minValue = perm_[pos];
+            minPos = pos;
+         }
+      }
+      perm_[minPos] = currentValue; // minValue renamed to currentValue
+      currentValue++;
+   }
+
+#ifdef DEBUG
+   printVector(perm_,"perm");
+   printVector(sizeA_,"sizeA");
+   printVector(outerSizeA_,"outerSizeA");
+   printVector(outerSizeB_,"outerSizeB");
+#endif
+}
+
 /**
   * \brief fuses indices whenever possible 
   * \detailed For instance:
@@ -1335,64 +1440,49 @@ void Transpose<floatType>::computeLeadingDimensions()
   * \return This function will initialize sizeA_, perm_, outerSizeA_, outersize_ and dim_
 */
 template<typename floatType>
-void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const int *outerSizeA, const int *outerSizeB, const int dim)
+void Transpose<floatType>::fuseIndices()
 {
    std::list< std::tuple<int, int> > fusedIndices;
 
-   dim_ = 0;
-   for(int i=0;i < dim ; ++i)
-   {
-      sizeA_[i] = sizeA[i];
-      if( outerSizeA != NULL && outerSizeA != nullptr)
-         outerSizeA_[i] = outerSizeA[i];
-      else
-         outerSizeA_[i] = -1;
-      if( outerSizeB != NULL && outerSizeB != nullptr )
-         outerSizeB_[i] = outerSizeB[i];
-      else
-         outerSizeB_[i] = -1;
-   }
-
+   std::vector<int> perm;
    // correct perm
-   for(int i=0;i < dim ; ++i){
-      perm_[dim_] = perm[i];
+   for(int i=0;i < dim_; ++i){
       // merge indices if the two consecutive entries are identical
-      while(i+1 < dim && perm[i] + 1 == perm[i+1] 
-            && (outerSizeA == NULL || outerSizeA == nullptr || sizeA[perm[i]] == outerSizeA[perm[i]]) 
-            && (outerSizeB == NULL || outerSizeB == nullptr || sizeA[perm[i]] == outerSizeB[i]) ){ 
+      int toMerge = i;
+      perm.push_back(perm_[i]);
+      while(i+1 < dim_ && perm_[i] + 1 == perm_[i+1] 
+            && (sizeA_[perm_[i]] == outerSizeA_[perm_[i]]) 
+            && (sizeA_[perm_[i]] == outerSizeB_[i]) ){ 
 #ifdef DEBUG
-         fprintf(stderr,"[HPTT] MERGING indices %d and %d\n",perm[i], perm[i+1]); 
+         fprintf(stderr,"[HPTT] MERGING indices %d and %d\n",perm_[i], perm_[i+1]); 
 #endif
-         fusedIndices.emplace_back( std::make_tuple(perm_[dim_],perm[i+1]) );
+         fusedIndices.emplace_back( std::make_tuple(perm_[toMerge],perm_[i+1]) );
          i++;
       }
-      dim_++;
    }
 
    // correct sizes and outer-sizes
    for( auto tup : fusedIndices )
    {
-      sizeA_[std::get<0>(tup)] *= sizeA[std::get<1>(tup)];
-      if( outerSizeA != NULL && outerSizeA != nullptr ){
-         outerSizeA_[std::get<0>(tup)] *= outerSizeA[std::get<1>(tup)];
-         outerSizeA_[std::get<1>(tup)] = -1;
-      }
-      if( outerSizeB != NULL && outerSizeB != nullptr){
-         int pos1 = findPos(std::get<0>(tup), perm, dim);
-         int pos2 = findPos(std::get<1>(tup), perm, dim);
-         outerSizeB_[pos1] *= outerSizeB[pos2];
-         outerSizeB_[pos2] = -1;
-      }
+      sizeA_[std::get<0>(tup)] *= sizeA_[std::get<1>(tup)];
+      outerSizeA_[std::get<0>(tup)] *= outerSizeA_[std::get<1>(tup)];
+      outerSizeA_[std::get<1>(tup)] = -1;
+
+      auto pos1 = std::find(perm_.begin(), perm_.end(), std::get<0>(tup)) - perm_.begin();
+      auto pos2 = std::find(perm_.begin(), perm_.end(), std::get<1>(tup)) - perm_.begin();
+      outerSizeB_[pos1] *= outerSizeB_[pos2];
+      outerSizeB_[pos2] = -1;
    }
 
-   // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
-   if ( dim_ != dim ) {
+   if ( fusedIndices.size() > 0 ) {
+      perm_ = perm;
+      // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
       int currentValue = 0;
-      for(int i=0;i < dim_; ++i){
+      for(int i=0;i < perm_.size(); ++i){
          //find smallest element in perm_ and rename it to currentValue
          int minValue = 1000000;
          int minPos = -1;
-         for(int pos=0; pos < dim_; ++pos){
+         for(int pos=0; pos < perm_.size(); ++pos){
             if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
                minValue = perm_[pos];
                minPos = pos;
@@ -1408,35 +1498,33 @@ void Transpose<floatType>::fuseIndices(const int *sizeA, const int* perm, const 
 
 
       // compact outer size (e.g.: outerSizeA_[] = {24,-1,5,-1,13} -> {24,5,13,-1,-1} -> {24,5,13}
-      for(int i=0;i < dim ; ++i)
+      for(int i=0;i < dim_ ; ++i)
          if( outerSizeA_[i] == -1 )
          {
             int j=i+1;
-            for(;j < dim ; ++j)
+            for(;j < dim_ ; ++j)
                if( outerSizeA_[j] != -1 )
                   break;
-            if( j < dim )
+            if( j < dim_ )
                std::swap(outerSizeA_[i], outerSizeA_[j]);
          }
-      outerSizeA_.resize(dim_);
-      for(int i=0;i < dim ; ++i)
+      for(int i=0;i < dim_ ; ++i)
          if( outerSizeB_[i] == -1 )
          {
             int j=i+1;
-            for(;j < dim ; ++j)
+            for(;j < dim_ ; ++j)
                if( outerSizeB_[j] != -1 )
                   break;
-            if( j < dim )
+            if( j < dim_ )
                std::swap(outerSizeB_[i], outerSizeB_[j]);
          }
+      dim_ -= fusedIndices.size();
+      outerSizeA_.resize(dim_);
       outerSizeB_.resize(dim_);
       sizeA_.resize(dim_);
       perm_.resize(dim_);
 
 #ifdef DEBUG
-      printf("\nperm: ");
-      for(int i=0;i < dim ; ++i)
-         printf("%d ",perm[i]);
       printf("\nperm_new: ");
       for(int i=0;i < dim_ ; ++i)
          printf("%d ",perm_[i]);
