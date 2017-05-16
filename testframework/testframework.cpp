@@ -95,7 +95,7 @@ static void getRandomTest(int &dim, uint32_t *perm, uint32_t *size, floatType &b
       size_str += std::to_string(size[i]) + " ";
    }
    printf("dim: %d\n", dim);
-   printf("beta: %f\n", beta);
+   printf("beta: %f\n", std::real(beta));
    printf("perm: %s\n", perm_str.c_str());
    printf("size: %s\n", size_str.c_str());
    printf("numThreads: %d\n",numThreads);
@@ -180,6 +180,12 @@ int main(int argc, char *argv[])
 
   printf("double tests: \n");
   runTests<double>();
+
+  printf("float complex tests: \n");
+  runTests<FloatComplex>();
+
+  printf("double complex tests: \n");
+  runTests<DoubleComplex>();
 
   printf("[SUCCESS] All tests have passed.\n");
   return 0;

@@ -11,7 +11,7 @@
 #include <iostream>
 #include <complex>
 
-//#include "defines.h"
+#include "defines.h"
 
 
 template<typename floatType>
@@ -66,6 +66,12 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim,
 template void transpose_ref<float>( uint32_t *size, uint32_t *perm, int dim, 
       const float* __restrict__ A, float alpha, 
       float* __restrict__ B, float beta);
+template void transpose_ref<FloatComplex>( uint32_t *size, uint32_t *perm, int dim, 
+      const FloatComplex* __restrict__ A, FloatComplex alpha, 
+      FloatComplex* __restrict__ B, FloatComplex beta);
 template void transpose_ref<double>( uint32_t *size, uint32_t *perm, int dim, 
       const double* __restrict__ A, double alpha, 
       double* __restrict__ B, double beta);
+template void transpose_ref<DoubleComplex>( uint32_t *size, uint32_t *perm, int dim, 
+      const DoubleComplex* __restrict__ A, DoubleComplex alpha, 
+      DoubleComplex* __restrict__ B, DoubleComplex beta);
