@@ -95,7 +95,7 @@ of HPTT and the reference implementation.
 
 # Performance Results
 
-![hptt](https://github.com/springer13/hptt/blob/c%2B%2B/benchmark/bw.png)
+![hptt](https://github.com/springer13/hptt/blob/master/benchmark/bw.png)
 
 See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
 
