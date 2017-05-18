@@ -45,4 +45,4 @@ all: ${OBJ}
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
 clean:
-	rm -rf src/*.o lib/libhptt.so
+	rm -rf src/*.o lib/libhptt.so lib/libhptt.a
