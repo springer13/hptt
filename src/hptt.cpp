@@ -25,11 +25,15 @@
 #include <numeric>
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
-#include <omp.h>
 #include <float.h>
 #include <stdio.h>
 #include <assert.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "hptt.h"
 #include "hptt_utils.h"
@@ -737,7 +741,9 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
    constexpr bool useStreamingStores = false;
 
    const int numTasks = plan->getNumTasks();
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(numThreads_)  if(numThreads_ > 1)
+#endif
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
@@ -798,7 +804,7 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
       if( useStreamingStores)
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t j = myStart; j < myEnd; j++)
-#pragma vector nontemporal
+_Pragma("vector nontemporal")
             for(int32_t i = 0; i < n0; i++)
                B[i + j * ldb] = alpha * A[i + j * lda];
          )
@@ -815,7 +821,12 @@ template<typename floatType>
 template<bool spawnThreads>
 void Transpose<floatType>::getStartEnd(int n, int &myStart, int &myEnd) const
 {
+#ifdef __OPENMP
    int myLocalThreadId = getLocalThreadId(omp_get_thread_num());
+#else
+   int myLocalThreadId = 0;
+#endif
+
    if(myLocalThreadId == -1 ) // skip those threads which do not participate in this plan
    {
       myStart = n;
@@ -1745,7 +1756,9 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
             auto plan = std::make_shared<Plan>(loopOrder, numThreadsAtLoop );
             const int numTasks = plan->getNumTasks();
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(numThreads_) if(numThreads_ > 1)
+#endif
             for( int taskId = 0; taskId < numTasks; taskId++)
             {
                ComputeNode *currentNode = plan->getRootNode(taskId);
@@ -1804,9 +1817,10 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
 template<typename floatType>
 float Transpose<floatType>::estimateExecutionTime( const std::shared_ptr<Plan> plan)
 {
-   double startTime = omp_get_wtime();
+   auto startTime = std::chrono::high_resolution_clock::now();
    this->executeEstimate(plan.get());
-   double elapsedTime = omp_get_wtime() - startTime;
+   double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double, std::milli> >
+      (std::chrono::high_resolution_clock::now() - startTime).count();
 
    const double minMeasurementTime = 0.1; // in seconds
 
@@ -1814,10 +1828,11 @@ float Transpose<floatType>::estimateExecutionTime( const std::shared_ptr<Plan> p
    int nRepeat = std::min(3, (int) std::ceil(minMeasurementTime / elapsedTime));
 
    //execute just a few iterations and exterpolate the result
-   startTime = omp_get_wtime();
+   startTime = std::chrono::high_resolution_clock::now();
    for(int i=0;i < nRepeat ; ++i) //ATTENTION: we are not clearing the caches inbetween runs
       this->executeEstimate( plan.get() );
-   elapsedTime = omp_get_wtime() - startTime;
+   elapsedTime = std::chrono::duration_cast<std::chrono::duration<double, std::milli> >
+      (std::chrono::high_resolution_clock::now() - startTime).count();
    elapsedTime /= nRepeat;
 
 #ifdef DEBUG
@@ -1862,11 +1877,14 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
    if( plans.size() > 1 )
    {
       int plansEvaluated = 0;
-      double startTime = omp_get_wtime();
+      auto startTime = std::chrono::high_resolution_clock::now();
       for( int plan_id = 0; plan_id < plans.size(); plan_id++ )
       {
          auto p = plans[plan_id];
-         if( omp_get_wtime() - startTime >= timeLimit ) // timelimit reached
+
+         double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double, std::milli> >
+            (std::chrono::high_resolution_clock::now() - startTime).count();
+         if( elapsedTime >= timeLimit ) // timelimit reached
             break;
 
          float estimatedTime = this->estimateExecutionTime( p );

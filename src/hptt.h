@@ -27,7 +27,10 @@
 #include <memory>
 #include <complex>
 #include <algorithm>
+
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 #include <stdio.h>
 
@@ -132,7 +135,9 @@ class Transpose{
          selectionMethod_(selectionMethod),
          selectedParallelStrategyId_(-1)
       {
+#ifdef _OPENMP
          omp_init_lock(&writelock);
+#endif
          sizeA_.resize(dim);
          perm_.resize(dim);
          outerSizeA_.resize(dim);
@@ -180,10 +185,16 @@ class Transpose{
                                           ldb_(other.ldb_),
                                           threadIds_(other.threadIds_) 
       { 
+#ifdef _OPENMP
          omp_init_lock(&writelock);
+#endif
       }
 
-      ~Transpose() { omp_destroy_lock(&writelock); }
+      ~Transpose() { 
+#ifdef _OPENMP
+         omp_destroy_lock(&writelock); 
+#endif
+      }
 
       /***************************************************
        * Getter & Setter
@@ -203,10 +214,12 @@ class Transpose{
       void printThreadIds() const noexcept { for( auto id : threadIds_) printf("%d, ",id); printf("\n"); } 
       int getMasterThreadId() const noexcept { return threadIds_[0]; } 
       void addThreadId(int threadId) noexcept { 
+#ifdef _OPENMP
          omp_set_lock(&writelock);
          threadIds_.push_back(threadId); 
          std::sort(threadIds_.begin(), threadIds_.end()); 
          omp_unset_lock(&writelock);
+#endif
       }
 
       /***************************************************
@@ -273,7 +286,9 @@ class Transpose{
       std::vector<int> threadIds_; 
       int numThreads_;
       int selectedParallelStrategyId_;
+#ifdef _OPENMP
       omp_lock_t writelock;
+#endif
 
       std::shared_ptr<Plan> masterPlan_; 
       SelectionMethod selectionMethod_;

@@ -34,7 +34,9 @@ int findPos(int value, const int *array, int n)
 
 void trashCache(double *A, double *B, int n)
 {
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
    for(int i = 0; i < n; i++)
       A[i] += 0.999 * B[i];
 }
