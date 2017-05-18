@@ -7,7 +7,7 @@ ifeq ($(CXX),g++)
 CXX_FLAGS += -fopenmp -mcpu=native 
 else
 ifeq ($(CXX),clang++)
-CXX_FLAGS += -fopenmp
+CXX_FLAGS += -fopenmp -march=native
 endif
 endif
 endif
@@ -25,7 +25,7 @@ scalar:
 	${MAKE} clean 
 	${MAKE} scalar2
 
-avx2:CXX_FLAGS+=-DHPTT_ARCH_AVX
+avx2:CXX_FLAGS+=-mavx -DHPTT_ARCH_AVX
 avx2: all
 arm2: CXX_FLAGS+=-mfpu=neon -DHPTT_ARCH_ARM
 arm2: all
