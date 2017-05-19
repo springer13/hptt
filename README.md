@@ -75,6 +75,7 @@ You must have a working C++ compiler with c++11 support. I have tested HPTT with
 
 * Intel's ICPC 15.0.3, 16.0.3, 17.0.2
 * GNU g++ 5.4, 6.2, 6.3
+* clang++ 3.8, 3.9
 
 # Benchmark
 
