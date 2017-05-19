@@ -28,15 +28,15 @@ typedef float floatType;
 #endif
 
 template<typename floatType>
-static double getZeroThreashold();
+static double getZeroThreshold();
 template<>
-double getZeroThreashold<double>() { return 1e-16;}
+double getZeroThreshold<double>() { return 1e-16;}
 template<>
-double getZeroThreashold<DoubleComplex>() { return 1e-16;}
+double getZeroThreshold<DoubleComplex>() { return 1e-16;}
 template<>
-double getZeroThreashold<float>() { return 1e-6;}
+double getZeroThreshold<float>() { return 1e-6;}
 template<>
-double getZeroThreashold<FloatComplex>() { return 1e-6;}
+double getZeroThreshold<FloatComplex>() { return 1e-6;}
 
 
 template<typename floatType>
@@ -54,7 +54,7 @@ int equal_(const floatType *A, const floatType*B, int total_size){
       diff = (diff < 0) ? -diff : diff;
       if(diff > 0){
          double relError = diff / max;
-         if(relError > 4e-5 && std::min(Aabs,Babs) > getZeroThreashold<floatType>()*5 ){
+         if(relError > 4e-5 && std::min(Aabs,Babs) > getZeroThreshold<floatType>()*5 ){
 //            fprintf(stderr,"%.3e  %.3e %.3e\n",relError, A[i], B[i]);
             error += 1;
          }

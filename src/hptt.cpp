@@ -52,15 +52,15 @@
 namespace hptt {
 
 template<typename floatType>
-static double getZeroThreashold();
+static double getZeroThreshold();
 template<>
-double getZeroThreashold<double>() { return 1e-16;}
+double getZeroThreshold<double>() { return 1e-16;}
 template<>
-double getZeroThreashold<DoubleComplex>() { return 1e-16;}
+double getZeroThreshold<DoubleComplex>() { return 1e-16;}
 template<>
-double getZeroThreashold<float>() { return 1e-6;}
+double getZeroThreshold<float>() { return 1e-6;}
 template<>
-double getZeroThreashold<FloatComplex>() { return 1e-6;}
+double getZeroThreshold<FloatComplex>() { return 1e-6;}
 
 
 template <typename floatType, int betaIsZero>
@@ -747,14 +747,14 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
-         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
+         if( std::abs(beta_) < getZeroThreshold<floatType>() ) {
             transpose_int<blocking_,blocking_,1,floatType, useStreamingStores>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
          } else {
             transpose_int<blocking_,blocking_,0,floatType, useStreamingStores>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
-         if( std::abs(beta_) < getZeroThreashold<floatType>() ) {
+         if( std::abs(beta_) < getZeroThreshold<floatType>() ) {
             transpose_int_constStride1<1,floatType, useStreamingStores>( A_, B_, 0.0, 1.0, rootNode);
          }else{
             transpose_int_constStride1<0,floatType, useStreamingStores>( A_, B_, 0.0, 1.0, rootNode);
