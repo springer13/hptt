@@ -108,10 +108,10 @@ struct micro_kernel<double, betaIsZero>
        __m256d reg_alpha = _mm256_set1_pd(alpha); // do not alter the content of B
        __m256d reg_beta = _mm256_set1_pd(beta); // do not alter the content of B
        //Load A
-       __m256d rowA0 = _mm256_load_pd((A +0*lda));
-       __m256d rowA1 = _mm256_load_pd((A +1*lda));
-       __m256d rowA2 = _mm256_load_pd((A +2*lda));
-       __m256d rowA3 = _mm256_load_pd((A +3*lda));
+       __m256d rowA0 = _mm256_loadu_pd((A +0*lda));
+       __m256d rowA1 = _mm256_loadu_pd((A +1*lda));
+       __m256d rowA2 = _mm256_loadu_pd((A +2*lda));
+       __m256d rowA3 = _mm256_loadu_pd((A +3*lda));
 
        //4x4 transpose micro kernel
        __m256d r4, r34, r3, r33;
@@ -133,26 +133,26 @@ struct micro_kernel<double, betaIsZero>
        //Load B
        if( !betaIsZero )
        {
-          __m256d rowB0 = _mm256_load_pd((B +0*ldb));
-          __m256d rowB1 = _mm256_load_pd((B +1*ldb));
-          __m256d rowB2 = _mm256_load_pd((B +2*ldb));
-          __m256d rowB3 = _mm256_load_pd((B +3*ldb));
+          __m256d rowB0 = _mm256_loadu_pd((B +0*ldb));
+          __m256d rowB1 = _mm256_loadu_pd((B +1*ldb));
+          __m256d rowB2 = _mm256_loadu_pd((B +2*ldb));
+          __m256d rowB3 = _mm256_loadu_pd((B +3*ldb));
 
           rowB0 = _mm256_add_pd( _mm256_mul_pd(rowB0, reg_beta), rowA0);
           rowB1 = _mm256_add_pd( _mm256_mul_pd(rowB1, reg_beta), rowA1);
           rowB2 = _mm256_add_pd( _mm256_mul_pd(rowB2, reg_beta), rowA2);
           rowB3 = _mm256_add_pd( _mm256_mul_pd(rowB3, reg_beta), rowA3);
           //Store B
-          _mm256_store_pd((B + 0 * ldb), rowB0);
-          _mm256_store_pd((B + 1 * ldb), rowB1);
-          _mm256_store_pd((B + 2 * ldb), rowB2);
-          _mm256_store_pd((B + 3 * ldb), rowB3);
+          _mm256_storeu_pd((B + 0 * ldb), rowB0);
+          _mm256_storeu_pd((B + 1 * ldb), rowB1);
+          _mm256_storeu_pd((B + 2 * ldb), rowB2);
+          _mm256_storeu_pd((B + 3 * ldb), rowB3);
        } else {
           //Store B
-          _mm256_store_pd((B + 0 * ldb), rowA0);
-          _mm256_store_pd((B + 1 * ldb), rowA1);
-          _mm256_store_pd((B + 2 * ldb), rowA2);
-          _mm256_store_pd((B + 3 * ldb), rowA3);
+          _mm256_storeu_pd((B + 0 * ldb), rowA0);
+          _mm256_storeu_pd((B + 1 * ldb), rowA1);
+          _mm256_storeu_pd((B + 2 * ldb), rowA2);
+          _mm256_storeu_pd((B + 3 * ldb), rowA3);
        }
     }
 };
@@ -165,14 +165,14 @@ struct micro_kernel<float, betaIsZero>
        __m256 reg_alpha = _mm256_set1_ps(alpha); // do not alter the content of B
        __m256 reg_beta = _mm256_set1_ps(beta); // do not alter the content of B
        //Load A
-       __m256 rowA0 = _mm256_load_ps((A +0*lda));
-       __m256 rowA1 = _mm256_load_ps((A +1*lda));
-       __m256 rowA2 = _mm256_load_ps((A +2*lda));
-       __m256 rowA3 = _mm256_load_ps((A +3*lda));
-       __m256 rowA4 = _mm256_load_ps((A +4*lda));
-       __m256 rowA5 = _mm256_load_ps((A +5*lda));
-       __m256 rowA6 = _mm256_load_ps((A +6*lda));
-       __m256 rowA7 = _mm256_load_ps((A +7*lda));
+       __m256 rowA0 = _mm256_loadu_ps((A +0*lda));
+       __m256 rowA1 = _mm256_loadu_ps((A +1*lda));
+       __m256 rowA2 = _mm256_loadu_ps((A +2*lda));
+       __m256 rowA3 = _mm256_loadu_ps((A +3*lda));
+       __m256 rowA4 = _mm256_loadu_ps((A +4*lda));
+       __m256 rowA5 = _mm256_loadu_ps((A +5*lda));
+       __m256 rowA6 = _mm256_loadu_ps((A +6*lda));
+       __m256 rowA7 = _mm256_loadu_ps((A +7*lda));
 
        //8x8 transpose micro kernel
        __m256 r121, r139, r120, r138, r71, r89, r70, r88, r11, r1, r55, r29, r10, r0, r54, r28;
@@ -214,14 +214,14 @@ struct micro_kernel<float, betaIsZero>
        //Load B
        if( !betaIsZero )
        {
-          __m256 rowB0 = _mm256_load_ps((B +0*ldb));
-          __m256 rowB1 = _mm256_load_ps((B +1*ldb));
-          __m256 rowB2 = _mm256_load_ps((B +2*ldb));
-          __m256 rowB3 = _mm256_load_ps((B +3*ldb));
-          __m256 rowB4 = _mm256_load_ps((B +4*ldb));
-          __m256 rowB5 = _mm256_load_ps((B +5*ldb));
-          __m256 rowB6 = _mm256_load_ps((B +6*ldb));
-          __m256 rowB7 = _mm256_load_ps((B +7*ldb));
+          __m256 rowB0 = _mm256_loadu_ps((B +0*ldb));
+          __m256 rowB1 = _mm256_loadu_ps((B +1*ldb));
+          __m256 rowB2 = _mm256_loadu_ps((B +2*ldb));
+          __m256 rowB3 = _mm256_loadu_ps((B +3*ldb));
+          __m256 rowB4 = _mm256_loadu_ps((B +4*ldb));
+          __m256 rowB5 = _mm256_loadu_ps((B +5*ldb));
+          __m256 rowB6 = _mm256_loadu_ps((B +6*ldb));
+          __m256 rowB7 = _mm256_loadu_ps((B +7*ldb));
 
           rowB0 = _mm256_add_ps( _mm256_mul_ps(rowB0, reg_beta), rowA0);
           rowB1 = _mm256_add_ps( _mm256_mul_ps(rowB1, reg_beta), rowA1);
@@ -232,23 +232,23 @@ struct micro_kernel<float, betaIsZero>
           rowB6 = _mm256_add_ps( _mm256_mul_ps(rowB6, reg_beta), rowA6);
           rowB7 = _mm256_add_ps( _mm256_mul_ps(rowB7, reg_beta), rowA7);
           //Store B
-          _mm256_store_ps((B + 0 * ldb), rowB0);
-          _mm256_store_ps((B + 1 * ldb), rowB1);
-          _mm256_store_ps((B + 2 * ldb), rowB2);
-          _mm256_store_ps((B + 3 * ldb), rowB3);
-          _mm256_store_ps((B + 4 * ldb), rowB4);
-          _mm256_store_ps((B + 5 * ldb), rowB5);
-          _mm256_store_ps((B + 6 * ldb), rowB6);
-          _mm256_store_ps((B + 7 * ldb), rowB7);
+          _mm256_storeu_ps((B + 0 * ldb), rowB0);
+          _mm256_storeu_ps((B + 1 * ldb), rowB1);
+          _mm256_storeu_ps((B + 2 * ldb), rowB2);
+          _mm256_storeu_ps((B + 3 * ldb), rowB3);
+          _mm256_storeu_ps((B + 4 * ldb), rowB4);
+          _mm256_storeu_ps((B + 5 * ldb), rowB5);
+          _mm256_storeu_ps((B + 6 * ldb), rowB6);
+          _mm256_storeu_ps((B + 7 * ldb), rowB7);
        } else {
-          _mm256_store_ps((B + 0 * ldb), rowA0);
-          _mm256_store_ps((B + 1 * ldb), rowA1);
-          _mm256_store_ps((B + 2 * ldb), rowA2);
-          _mm256_store_ps((B + 3 * ldb), rowA3);
-          _mm256_store_ps((B + 4 * ldb), rowA4);
-          _mm256_store_ps((B + 5 * ldb), rowA5);
-          _mm256_store_ps((B + 6 * ldb), rowA6);
-          _mm256_store_ps((B + 7 * ldb), rowA7);
+          _mm256_storeu_ps((B + 0 * ldb), rowA0);
+          _mm256_storeu_ps((B + 1 * ldb), rowA1);
+          _mm256_storeu_ps((B + 2 * ldb), rowA2);
+          _mm256_storeu_ps((B + 3 * ldb), rowA3);
+          _mm256_storeu_ps((B + 4 * ldb), rowA4);
+          _mm256_storeu_ps((B + 5 * ldb), rowA5);
+          _mm256_storeu_ps((B + 6 * ldb), rowA6);
+          _mm256_storeu_ps((B + 7 * ldb), rowA7);
        }
     }
 };
