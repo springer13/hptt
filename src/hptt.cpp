@@ -255,11 +255,11 @@ struct micro_kernel<float, betaIsZero>
 
 template<>
 void streamingStore<float>( float* out, const float*in ){
-   _mm256_stream_ps(out, _mm256_load_ps(in));
+   _mm256_stream_ps(out, _mm256_loadu_ps(in));
 }
 template<>
 void streamingStore<double>( double* out, const double*in ){
-   _mm256_stream_pd(out, _mm256_load_pd(in));
+   _mm256_stream_pd(out, _mm256_loadu_pd(in));
 }
 #else
 template<typename floatType>
