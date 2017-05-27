@@ -1292,7 +1292,7 @@ void Transpose<floatType>::verifyParameter(const int *size, const int* perm, con
    for(int i=0;i < dim ; ++i)
    {
       if( size[i] <= 0 ) {
-         fprintf(stderr,"[HPTT] ERROR: size invalid\n");
+         fprintf(stderr,"[HPTT] ERROR: size at position %d is invalid\n", i);
          exit(-1);
       }
       found[ perm[i] ] = 1;
@@ -1415,25 +1415,37 @@ void Transpose<floatType>::skipIndices(const int *sizeA, const int* perm, const 
       }
 
    dim_ = dim - skipped;
-   perm_.resize(dim_);
-   sizeA_.resize(dim_);
-   outerSizeA_.resize(dim_);
-   outerSizeB_.resize(dim_);
+   if( dim_ == 0 ){
+      dim_ = 1;
+      perm_.resize(dim_);
+      sizeA_.resize(dim_);
+      outerSizeA_.resize(dim_);
+      outerSizeB_.resize(dim_);
+      perm_[0] = 0;
+      sizeA_[0] = 1;
+      outerSizeA_[0] = 1;
+      outerSizeB_[0] = 1;
+   } else {
+      perm_.resize(dim_);
+      sizeA_.resize(dim_);
+      outerSizeA_.resize(dim_);
+      outerSizeB_.resize(dim_);
 
-   // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
-   int currentValue = 0;
-   for(int i=0;i < dim_; ++i){
-      //find smallest element in perm_ and rename it to currentValue
-      int minValue = 1000000;
-      int minPos = -1;
-      for(int pos=0; pos < dim_; ++pos){
-         if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
-            minValue = perm_[pos];
-            minPos = pos;
+      // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
+      int currentValue = 0;
+      for(int i=0;i < dim_; ++i){
+         //find smallest element in perm_ and rename it to currentValue
+         int minValue = 1000000;
+         int minPos = -1;
+         for(int pos=0; pos < dim_; ++pos){
+            if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
+               minValue = perm_[pos];
+               minPos = pos;
+            }
          }
+         perm_[minPos] = currentValue; // minValue renamed to currentValue
+         currentValue++;
       }
-      perm_[minPos] = currentValue; // minValue renamed to currentValue
-      currentValue++;
    }
 
 #ifdef DEBUG
