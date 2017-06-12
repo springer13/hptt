@@ -1882,6 +1882,11 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
       return plans[0];
 
    double timeLimit = this->getTimeLimit() * 1000; //in ms
+   int maxAutotuningCandidates = plans.size();
+   if( maxAutotuningCandidates_ != -1 ){
+      maxAutotuningCandidates = maxAutotuningCandidates_;
+      timeLimit = 1e9;
+   }
 
    float minTime = FLT_MAX;
    int bestPlan_id = 0;
@@ -1890,7 +1895,7 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
    {
       int plansEvaluated = 0;
       auto startTime = std::chrono::high_resolution_clock::now();
-      for( int plan_id = 0; plan_id < plans.size(); plan_id++ )
+      for( int plan_id = 0; plan_id < maxAutotuningCandidates; plan_id++ )
       {
          auto p = plans[plan_id];
 
@@ -1960,6 +1965,55 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
    plan->createPlan();
    return plan;
 }
+
+
+std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
+                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                  const float beta, float *B, const int *outerSizeB, 
+                  const int maxAutotuningCandidates,
+                  const int numThreads, const int *threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<float> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, MEASURE, numThreads, threadIds));
+   plan->setMaxAutotuningCandidates(maxAutotuningCandidates);
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
+                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                  const double beta, double *B, const int *outerSizeB, 
+                  const int maxAutotuningCandidates,
+                  const int numThreads, const int *threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<double> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, MEASURE, numThreads, threadIds ));
+   plan->setMaxAutotuningCandidates(maxAutotuningCandidates);
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
+                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
+                  const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
+                  const int maxAutotuningCandidates,
+                  const int numThreads, const int *threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, MEASURE, numThreads, threadIds));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
+                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
+                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
+                  const int maxAutotuningCandidates,
+                  const int numThreads, const int *threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(sizeA, perm, outerSizeA, outerSizeB, dim, A, alpha, B, beta, MEASURE, numThreads, threadIds ));
+   plan->setMaxAutotuningCandidates(maxAutotuningCandidates);
+   plan->createPlan();
+   return plan;
+}
+
 
 template void Transpose<float>::execute_expert<true, true, true>();
 template void Transpose<float>::execute_expert<true, false, true>();

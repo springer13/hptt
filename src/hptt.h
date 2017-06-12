@@ -133,6 +133,7 @@ class Transpose{
          masterPlan_(nullptr),
          blocking_constStride1_(1), //TODO
          selectionMethod_(selectionMethod),
+         maxAutotuningCandidates_(-1),
          selectedParallelStrategyId_(-1)
       {
 #ifdef _OPENMP
@@ -177,6 +178,7 @@ class Transpose{
                                           masterPlan_(other.masterPlan_),
                                           selectionMethod_(other.selectionMethod_),
                                           selectedParallelStrategyId_(other.selectedParallelStrategyId_),
+                                          maxAutotuningCandidates_(other.maxAutotuningCandidates_),
                                           sizeA_(other.sizeA_),
                                           perm_(other.perm_),
                                           outerSizeA_(other.outerSizeA_),
@@ -213,6 +215,11 @@ class Transpose{
       void resetThreadIds() noexcept { threadIds_.clear(); }
       void printThreadIds() const noexcept { for( auto id : threadIds_) printf("%d, ",id); printf("\n"); } 
       int getMasterThreadId() const noexcept { return threadIds_[0]; } 
+      /**
+       * setMaxAutotuningCandidates() enables users to specify the number of
+       * candidates that should be tested during the autotuning phase
+      */
+      void setMaxAutotuningCandidates (int num) { maxAutotuningCandidates_ = num; } 
       void addThreadId(int threadId) noexcept { 
 #ifdef _OPENMP
          omp_set_lock(&writelock);
@@ -292,6 +299,7 @@ class Transpose{
 
       std::shared_ptr<Plan> masterPlan_; 
       SelectionMethod selectionMethod_;
+      int maxAutotuningCandidates_;
       static constexpr int blocking_micro_ = REGISTER_BITS / 8 / sizeof(floatType);
       static constexpr int blocking_ = blocking_micro_ * 4;
       int blocking_constStride1_; //blocking for perm[0] == 0, block in the next two leading dimensions
@@ -333,6 +341,32 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
                  const int numThreads, const int *threadIds = nullptr);
+
+std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
+                 const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                 const float beta, float *B, const int *outerSizeB, 
+                 const int maxAutotuningCandidates,
+                 const int numThreads, const int *threadIds = nullptr);
+
+std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
+                 const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                 const double beta, double *B, const int *outerSizeB, 
+                 const int maxAutotuningCandidates,
+                 const int numThreads, const int *threadIds = nullptr);
+
+std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
+                 const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
+                 const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
+                 const int maxAutotuningCandidates,
+                 const int numThreads, const int *threadIds = nullptr);
+
+std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
+                 const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
+                 const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
+                 const int maxAutotuningCandidates,
+                 const int numThreads, const int *threadIds = nullptr);
+
+
 
 
 extern template class Transpose<float>;
