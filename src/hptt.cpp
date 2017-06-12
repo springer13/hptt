@@ -1848,7 +1848,7 @@ float Transpose<floatType>::estimateExecutionTime( const std::shared_ptr<Plan> p
    elapsedTime /= nRepeat;
 
 #ifdef DEBUG
-   printf("Estimated time: %.3e ms.\n",elapsedTime * 1000); 
+   printf("Estimated time: %.3e ms.\n",elapsedTime); 
 #endif
    return elapsedTime; 
 }
@@ -1881,7 +1881,7 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
    if( selectionMethod_ == ESTIMATE ) // fast return
       return plans[0];
 
-   double timeLimit = this->getTimeLimit(); //in seconds
+   double timeLimit = this->getTimeLimit() * 1000; //in ms
 
    float minTime = FLT_MAX;
    int bestPlan_id = 0;
