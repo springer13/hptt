@@ -134,7 +134,8 @@ class Transpose{
          blocking_constStride1_(1), //TODO
          selectionMethod_(selectionMethod),
          maxAutotuningCandidates_(-1),
-         selectedParallelStrategyId_(-1)
+         selectedParallelStrategyId_(-1),
+         selectedLoopOrderId_(-1)
       {
 #ifdef _OPENMP
          omp_init_lock(&writelock);
@@ -178,6 +179,7 @@ class Transpose{
                                           masterPlan_(other.masterPlan_),
                                           selectionMethod_(other.selectionMethod_),
                                           selectedParallelStrategyId_(other.selectedParallelStrategyId_),
+                                          selectedLoopOrderId_(other.selectedLoopOrderId_),
                                           maxAutotuningCandidates_(other.maxAutotuningCandidates_),
                                           sizeA_(other.sizeA_),
                                           perm_(other.perm_),
@@ -204,6 +206,7 @@ class Transpose{
       int getNumThreads() const noexcept { return numThreads_; }
       void setNumThreads(int numThreads) noexcept { numThreads_ = numThreads; }
       void setParallelStrategy(int id) noexcept { selectedParallelStrategyId_ = id; }
+      void setLoopOrder(int id) noexcept { selectedLoopOrderId_ = id; }
       floatType getAlpha() const noexcept { return alpha_; }
       floatType getBeta() const noexcept { return beta_; }
       void setAlpha(floatType alpha) noexcept { alpha_ = alpha; }
@@ -293,6 +296,7 @@ class Transpose{
       std::vector<int> threadIds_; 
       int numThreads_;
       int selectedParallelStrategyId_;
+      int selectedLoopOrderId_;
 #ifdef _OPENMP
       omp_lock_t writelock;
 #endif

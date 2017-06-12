@@ -1232,13 +1232,16 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
       parallelismStrategies.emplace_back(std::vector<int>(dim_, 1));
       return;
    }
-   parallelismStrategies.emplace_back(std::vector<int>(dim_, 1));
-   getBestParallelismStrategy(parallelismStrategies[0]);
+   std::vector<int> bestParallelismStrategy(dim_, 1);
+   getBestParallelismStrategy(bestParallelismStrategy);
    if( this->infoLevel_ > 0 )
-      printf("Loadbalancing: %f\n", getLoadBalance(parallelismStrategies[0]));
+      printf("Loadbalancing: %f\n", getLoadBalance(bestParallelismStrategy));
 
    if( selectionMethod_ == ESTIMATE )
+   {
+      parallelismStrategies.push_back(bestParallelismStrategy);
       return;
+   }
 
    // ATTENTION: we don't care about the case where numThreads_ is a large prime number...
    // (sorry, KNC)
@@ -1271,6 +1274,8 @@ void Transpose<floatType>::getParallelismStrategies(std::vector<std::vector<int>
          { 
             return this->parallelismCostHeuristic(loopOrder1) < this->parallelismCostHeuristic(loopOrder2); 
          });
+
+   parallelismStrategies.insert(parallelismStrategies.begin(), bestParallelismStrategy);
 
    if( this->infoLevel_ > 1 )
       for( auto strat : parallelismStrategies ){
@@ -1747,6 +1752,13 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
       printVector(parStrategy,"selected parallel: ");
       parallelismStrategies.clear();
       parallelismStrategies.push_back(parStrategy);
+   }
+   if( selectedLoopOrderId_ != -1 ){
+      int selectedLoopOrderId = std::min((int)loopOrders.size()-1, selectedLoopOrderId_);
+      std::vector<int>loopOrder(loopOrders[selectedLoopOrderId]);
+      printVector(loopOrder,"selected loopOrder: ");
+      loopOrders.clear();
+      loopOrders.push_back(loopOrder);
    }
 
    const int posStride1A_inB = findPos(0, perm_);
