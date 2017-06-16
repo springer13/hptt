@@ -115,15 +115,21 @@ please feel free to contact me via email (springer@aices.rwth-aachen.de).
 In case you want refer to HPTT as part of a research paper, please cite the following
 article [(pdf)](https://arxiv.org/abs/1704.04374):
 ```
-@article{springer2017a,
-   author      = {Paul Springer and Tong Su and Paolo Bientinesi},
-   title       = {{HPTT}: A High-Performance Tensor Transposition C++ Library},
-   archivePrefix = "arXiv",
-   eprint = {1704.04374},
-   primaryClass = "quant-ph",
-   journal     = {CoRR},
-   year        = {2017},
-   issue_date  = {April 2017},
-   url         = {https://arxiv.org/abs/1704.04374}
+@inproceedings{hptt2017,
+ author = {Springer, Paul and Su, Tong and Bientinesi, Paolo},
+ title = {{HPTT}: {A} {H}igh-{P}erformance {T}ensor {T}ransposition {C}++ {L}ibrary},
+ booktitle = {Proceedings of the 4th ACM SIGPLAN International Workshop on Libraries, Languages, and Compilers for Array Programming},
+ series = {ARRAY 2017},
+ year = {2017},
+ isbn = {978-1-4503-5069-3},
+ location = {Barcelona, Spain},
+ pages = {56--62},
+ numpages = {7},
+ url = {http://doi.acm.org/10.1145/3091966.3091968},
+ doi = {10.1145/3091966.3091968},
+ acmid = {3091968},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {High-Performance Computing, autotuning, multidimensional transposition, tensor transposition, tensors, vectorization},
 }
 ``` 
