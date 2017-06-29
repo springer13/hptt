@@ -821,7 +821,7 @@ template<typename floatType>
 template<bool spawnThreads>
 void Transpose<floatType>::getStartEnd(int n, int &myStart, int &myEnd) const
 {
-#ifdef __OPENMP
+#ifdef _OPENMP
    int myLocalThreadId = getLocalThreadId(omp_get_thread_num());
 #else
    int myLocalThreadId = 0;
