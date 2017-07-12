@@ -35,9 +35,9 @@
 #include <omp.h>
 #endif
 
-#include "hptt.h"
-#include "hptt_utils.h"
-#include "macros.h"
+#include <hptt.h>
+#include <hptt_utils.h>
+#include <macros.h>
 
 #define NDEBUG
 

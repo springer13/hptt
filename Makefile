@@ -1,4 +1,5 @@
 CXX_FLAGS=-O3 -std=c++11 -fPIC
+INCLUDE_PATH=-I./include/
 
 ifeq ($(CXX),icpc)
 CXX_FLAGS += -qopenmp -xhost 
