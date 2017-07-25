@@ -21,14 +21,13 @@
 #include <omp.h>
 #endif
 
-#include <utils.h>
-#include <macros.h>
-#include <compute_node.h>
-#include <utils.h>
-#include <types.h>
-#include <plan.h>
-
-#include <transpose.h>
+#include "../include/utils.h"
+#include "../include/macros.h"
+#include "../include/compute_node.h"
+#include "../include/utils.h"
+#include "../include/hptt_types.h"
+#include "../include/plan.h"
+#include "../include/transpose.h"
 
 namespace hptt {
 

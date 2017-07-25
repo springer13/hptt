@@ -8,7 +8,7 @@
 #include <vector>
 #include <iostream>
 
-#include "types.h"
+#include "hptt_types.h"
 
 namespace hptt {
   
