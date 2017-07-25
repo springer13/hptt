@@ -16,7 +16,7 @@
 #include <cmath>
 #include <complex>
 
-#include "../src/hptt.h"
+#include "../include/hptt.h"
 #include "../benchmark/reference.h"
 #include "../benchmark/defines.h"
 

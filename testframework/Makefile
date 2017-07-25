@@ -26,7 +26,7 @@ LIB_PATH=-L../lib/
 LIBS=-lhptt
 
 all: ${OBJ}
-	${CXX} ${OBJ} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} -o benchmark.exe
+	${CXX} ${OBJ} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} -o testframework.exe
 
 %.o: %.cpp
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
