@@ -19,6 +19,17 @@
 
 #pragma once
 
+#ifdef DEBUG
+#define HPTT_ERROR_INFO(str) fprintf(stdout, "[INFO] %s:%d : %s\n", __FILE__, __LINE__, str); exit(-1);
+#else
+#define HPTT_ERROR_INFO(str)
+#endif
+
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#define INLINE __forceinline
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define INLINE __attribute__((always_inline))
+#endif
 
 #ifdef _OPENMP
 

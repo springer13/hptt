@@ -3,3 +3,8 @@
 *.swp
 *.swo
 tags
+*.exe
+data/
+html/
+latex/
+old/

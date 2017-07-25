@@ -9,7 +9,22 @@
 #include <vector>
 #include <iostream>
 
+#include "types.h"
+
 namespace hptt {
+  
+template<typename floatType>
+static double getZeroThreshold();
+template<>
+double getZeroThreshold<double>() { return 1e-16;}
+template<>
+double getZeroThreshold<DoubleComplex>() { return 1e-16;}
+template<>
+double getZeroThreshold<float>() { return 1e-6;}
+template<>
+double getZeroThreshold<FloatComplex>() { return 1e-6;}
+
+void trashCache(double *A, double *B, int n);
 
 template<typename t>
 int hasItem(const std::vector<t> &vec, t value)
