@@ -17,31 +17,10 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <tuple>
-#include <string>
 #include <vector>
-#include <list>
-#include <algorithm>
-#include <numeric>
-#include <iostream>
-#include <cmath>
-#include <chrono>
+#include <memory>
 
-#include <float.h>
-#include <stdio.h>
-#include <assert.h>
-
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
-#include <hptt.h>
-#include <hptt_utils.h>
-#include <macros.h>
-
-#define NDEBUG
-
-//#define HPTT_TIMERS
+#include <transpose.h>
 
 namespace hptt {
 

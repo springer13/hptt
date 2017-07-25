@@ -21,22 +21,14 @@
 
 #pragma once
 
-#include <list>
 #include <vector>
 #include <memory>
-#include <complex>
-#include <algorithm>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-#include <stdio.h>
 
-#include "compute_node.h"
-#include "hptt_utils.h"
-#include "types.h"
-#include "plan.h"
 #include "transpose.h"
 
 

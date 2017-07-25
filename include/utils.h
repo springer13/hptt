@@ -2,8 +2,7 @@
  * @author: Paul Springer (springer@aices.rwth-aachen.de)
  */
 
-#ifndef HPTT_UTILS_H
-#define HPTT_UTILS_H
+#pragma once
 
 #include <list>
 #include <vector>
@@ -64,7 +63,5 @@ int findPos(int value, const int *array, int n);
 
 int factorial(int n);
 }
-
-#endif
 
 
