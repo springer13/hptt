@@ -6,6 +6,7 @@
 #define HPTT_UTILS_H
 
 #include <list>
+#include <vector>
 #include <iostream>
 
 namespace hptt {

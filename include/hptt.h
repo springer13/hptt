@@ -34,14 +34,11 @@
 
 #include <stdio.h>
 
+#include "compute_node.h"
 #include "hptt_utils.h"
+#include "types.h"
+#include "plan.h"
 
-#define REGISTER_BITS 256 // AVX
-
-#ifdef HPTT_ARCH_ARM
-#undef REGISTER_BITS 
-#define REGISTER_BITS 128 // ARM
-#endif
 
 namespace hptt {
 
@@ -51,61 +48,11 @@ namespace hptt {
 #define HPTT_ERROR_INFO(str)
 #endif
 
-using FloatComplex = std::complex<float>;
-using DoubleComplex = std::complex<double>;
-
-class ComputeNode{
-   public:
-      ComputeNode() : start(-1), end(-1), inc(-1), lda(-1), ldb(-1), next(nullptr) {}
-
-      ~ComputeNode() {
-         if ( next != nullptr )
-            delete next;
-      }
-
-   size_t start;
-   size_t end;
-   size_t inc;
-   size_t lda;
-   size_t ldb;
-   ComputeNode *next;
-};
-
-class Plan{
-   public:
-      Plan() : rootNodes_(nullptr), numTasks_(0) { }
-
-      Plan(std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop) : rootNodes_(nullptr), loopOrder_(loopOrder), numThreadsAtLoop_(numThreadsAtLoop) {
-         numTasks_ = 1;
-         for(auto nt : numThreadsAtLoop)
-            numTasks_ *= nt;
-         rootNodes_ = new ComputeNode[numTasks_];
-      }
-
-      ~Plan() {
-         if ( rootNodes_ != nullptr )
-            delete[] rootNodes_;
-      }
-
-      void print() const {
-         printVector(loopOrder_,"LoopOrder");
-         printVector(numThreadsAtLoop_,"Parallelization");
-      }
-      const ComputeNode* getRootNode_const(int threadId) const { return &rootNodes_[threadId]; }
-      ComputeNode* getRootNode(int threadId) const { return &rootNodes_[threadId]; }
-      int getNumTasks() const { return numTasks_; } 
-
-   private:
-      int numTasks_;
-      std::vector<int> loopOrder_;
-      std::vector<int> numThreadsAtLoop_;
-      ComputeNode *rootNodes_;
-};
-
 enum SelectionMethod { ESTIMATE, MEASURE, PATIENT, CRAZY };
 
 template<typename floatType>
-class Transpose{
+class Transpose
+{
 
    public:
                   
@@ -205,8 +152,6 @@ class Transpose{
        ***************************************************/
       int getNumThreads() const noexcept { return numThreads_; }
       void setNumThreads(int numThreads) noexcept { numThreads_ = numThreads; }
-      void setParallelStrategy(int id) noexcept { selectedParallelStrategyId_ = id; }
-      void setLoopOrder(int id) noexcept { selectedLoopOrderId_ = id; }
       floatType getAlpha() const noexcept { return alpha_; }
       floatType getBeta() const noexcept { return beta_; }
       void setAlpha(floatType alpha) noexcept { alpha_ = alpha; }
@@ -223,6 +168,17 @@ class Transpose{
        * candidates that should be tested during the autotuning phase
       */
       void setMaxAutotuningCandidates (int num) { maxAutotuningCandidates_ = num; } 
+
+      /**
+       * This thread-safe function adds an OpenMP threadId to the set of threads
+       * that will participate in this tensor transposition. This function is
+       * only required in conjunction with the execute_expert() interface where
+       * the transposition is executed from within a parallel region (i.e.,~HPTT
+       * does not spawn the threads). It is the programmers responsibility to
+       * specify the correct thread IDs that participate in this call.  
+       *
+       * \param[in] threadId An OpenMP threadId 
+       */
       void addThreadId(int threadId) noexcept { 
 #ifdef _OPENMP
          omp_set_lock(&writelock);
@@ -237,8 +193,33 @@ class Transpose{
        ***************************************************/
       void createPlan();
 
+      /**
+       * Executes the transposition. This functions requires that the plan has
+       * already been created via the createPlan() function.
+       * This function behaves similarly to the execute() function but it
+       * offers additional template parameters to improve performance for very
+       * small tensor transpositions. Moreover it adds more flexibility.
+       *
+       * \param[in] useStreamingStores if this variable is set, HPTT will use
+       *                         streaming stores which improves performance because they avoid the 
+       *                         write-allocate traffic incurred by the write to B. However, there 
+       *                         exist situations in which one wants to avoid to
+       *                         avoid streaming stores because these
+       *                         instructions invalidate the cachelines
+       *                         immediately.
+       * \param[in] spawnThreads if the variable is set, the threads will be
+       *                         spawned from within this call, otherwise it is
+       *                         expected that this function call executes from
+       *                         within a parallel region.
+       * \param[in] betaIsZero   only set this variable if beta is zero.
+       */
       template<bool useStreamingStores=true, bool spawnThreads=true, bool betaIsZero>
       void execute_expert() noexcept;
+
+      /**
+       * Executes the transposition. This functions requires that the plan has
+       * already been created via the createPlan() function.
+       */
       void execute() noexcept;
 
    private:
@@ -255,6 +236,8 @@ class Transpose{
       int getLocalThreadId(int myThreadId) const;
       template<bool spawnThreads>
       void getStartEnd(int n, int &myStart, int &myEnd) const;
+      void setParallelStrategy(int id) noexcept { selectedParallelStrategyId_ = id; }
+      void setLoopOrder(int id) noexcept { selectedLoopOrderId_ = id; }
 
       /***************************************************
        * Helper Methods
@@ -345,6 +328,33 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
                  const int numThreads, const int *threadIds = nullptr);
+
+
+std::shared_ptr<hptt::Transpose<float> > create_plan( const std::vector<int> &perm, const int dim,
+                 const float alpha, const float *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                 const float beta, float *B, const std::vector<int> &outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads, const std::vector<int> &threadIds = {});
+
+std::shared_ptr<hptt::Transpose<double> > create_plan( const std::vector<int> &perm, const int dim,
+                 const double alpha, const double *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                 const double beta, double *B, const std::vector<int> &outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads, const std::vector<int> &threadIds = {});
+
+std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const std::vector<int> &perm, const int dim,
+                 const FloatComplex alpha, const FloatComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                 const FloatComplex beta, FloatComplex *B, const std::vector<int> &outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads, const std::vector<int> &threadIds = {});
+
+std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const std::vector<int> &perm, const int dim,
+                 const DoubleComplex alpha, const DoubleComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                 const DoubleComplex beta, DoubleComplex *B, const std::vector<int> &outerSizeB, 
+                 const SelectionMethod selectionMethod,
+                 const int numThreads, const std::vector<int> &threadIds = {});
+
+
 
 std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 

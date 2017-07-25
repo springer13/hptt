@@ -1979,6 +1979,52 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
 }
 
 
+
+std::shared_ptr<hptt::Transpose<float> > create_plan( const std::vector<int> &perm, const int dim,
+                  const float alpha, const float *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                  const float beta, float *B, const std::vector<int> &outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const std::vector<int> &threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<float> >(&sizeA[0], &perm[0], &outerSizeA[0], &outerSizeB[0], dim, A, alpha, B, beta, selectionMethod, numThreads, (threadIds.size() > 0 ) ? &threadIds[0] : nullptr ));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<double> > create_plan( const std::vector<int> &perm, const int dim,
+                  const double alpha, const double *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                  const double beta, double *B, const std::vector<int> &outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const std::vector<int> &threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<double> >(&sizeA[0], &perm[0], &outerSizeA[0], &outerSizeB[0], dim, A, alpha, B, beta, selectionMethod, numThreads, (threadIds.size() > 0 ) ? &threadIds[0] : nullptr ));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const std::vector<int> &perm, const int dim,
+                  const FloatComplex alpha, const FloatComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                  const FloatComplex beta, FloatComplex *B, const std::vector<int> &outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const std::vector<int> &threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<FloatComplex> >(&sizeA[0], &perm[0], &outerSizeA[0], &outerSizeB[0], dim, A, alpha, B, beta, selectionMethod, numThreads, (threadIds.size() > 0 ) ? &threadIds[0] : nullptr ));
+   plan->createPlan();
+   return plan;
+}
+
+std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const std::vector<int> &perm, const int dim,
+                  const DoubleComplex alpha, const DoubleComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
+                  const DoubleComplex beta, DoubleComplex *B, const std::vector<int> &outerSizeB, 
+                  const SelectionMethod selectionMethod,
+                  const int numThreads, const std::vector<int> &threadIds)
+{
+   auto plan(std::make_shared<hptt::Transpose<DoubleComplex> >(&sizeA[0], &perm[0], &outerSizeA[0], &outerSizeB[0], dim, A, alpha, B, beta, selectionMethod, numThreads, (threadIds.size() > 0 ) ? &threadIds[0] : nullptr ));
+   plan->createPlan();
+   return plan;
+}
+
+
 std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int dim,
                   const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
                   const float beta, float *B, const int *outerSizeB, 
