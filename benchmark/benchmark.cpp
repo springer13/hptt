@@ -15,11 +15,20 @@
 #include <cmath>
 #include <complex>
 
-#include "../src/hptt.h"
+#include "../include/hptt.h"
 
 #include "defines.h"
 #include "reference.h"
 typedef float floatType;
+
+void trashCache(double *A, double *B, int n)
+{
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+   for(int i = 0; i < n; i++)
+      A[i] += 0.999 * B[i];
+}
 
 //#define ORIG_TTC
 
@@ -82,6 +91,7 @@ int main(int argc, char *argv[])
 
   if( argc < 2 ){
      printf("Usage: <dim> <permutation each index separated by ' '> <size of each index separated by ' '>\n");
+     printf("   Example: ./benchmark.exe 2 1 0 32 64\n");
      exit(-1);
   }
   int dim = atoi(argv[1]);
@@ -166,7 +176,7 @@ int main(int argc, char *argv[])
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
         restore(B, B_proto, total_size);
-        hptt::trashCache(trash1, trash2, largerThanL3);
+        trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
         plan->execute();
@@ -180,7 +190,7 @@ int main(int argc, char *argv[])
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
         restore(B, B_ref, total_size);
-        hptt::trashCache(trash1, trash2, largerThanL3);
+        trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         transpose_ref( size, perm, dim, A, alpha, B_ref, beta);
         double elapsed_time = omp_get_wtime() - begin_time;
@@ -211,7 +221,7 @@ int main(int argc, char *argv[])
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
         restore(B, B_orig, total_size);
-        hptt::trashCache(trash1, trash2, largerThanL3);
+        trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
         // Execute transpose
         ttc_transpose(ttc_handle, &param, A, B_orig);

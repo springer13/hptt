@@ -9,6 +9,11 @@ namespace hptt {
 
 class ComputeNode;
 
+/**
+ * \brief A plan encodes the execution of a tensor transposition.
+ *
+ * It stores the loop order and parallelizes each loop.
+ */
 class Plan
 {
    public:
@@ -27,7 +32,7 @@ class Plan
 
    private:
       int numTasks_;
-      std::vector<int> loopOrder_;
+      std::vector<int> loopOrder_; //!< loop order. For example, if \f$ B_{1,0,2} \gets A_{0,1,2}\f$. loopOrder_ = {1,0,2} denotes that B is travesed in a linear fashion.
       std::vector<int> numThreadsAtLoop_;
       ComputeNode *rootNodes_;
 };

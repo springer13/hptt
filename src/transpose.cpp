@@ -1,3 +1,7 @@
+/**
+ * \file
+ * Compute the tensor transposition
+ */
 
 #include <tuple>
 #include <string>
@@ -558,29 +562,29 @@ void transpose_int_scalar( const floatType* __restrict__ A, int sizeStride1A,
                                   floatType* __restrict__ B, int sizeStride1B, const floatType alpha, const floatType beta, const ComputeNode* plan)
 {
    const int32_t end = plan->end;
-   const size_t lda_ = plan->lda;
-   const size_t ldb_ = plan->ldb;
+   const size_t lda = plan->lda;
+   const size_t ldb = plan->ldb;
    if( plan->next->next != nullptr ){
       // recurse
       int i = plan->start;
-      if( lda_ == 1)
-         transpose_int_scalar<betaIsZero>( &A[i*lda_], end - plan->start, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
-      else if( ldb_ == 1)
-         transpose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], end - plan->start, alpha, beta, plan->next);
+      if( lda == 1)
+         transpose_int_scalar<betaIsZero>( &A[i*lda], end - plan->start, &B[i*ldb], sizeStride1B, alpha, beta, plan->next);
+      else if( ldb == 1)
+         transpose_int_scalar<betaIsZero>( &A[i*lda], sizeStride1A, &B[i*ldb], end - plan->start, alpha, beta, plan->next);
       else
          for(; i < end; i++)
-            transpose_int_scalar<betaIsZero>( &A[i*lda_], sizeStride1A, &B[i*ldb_], sizeStride1B, alpha, beta, plan->next);
+            transpose_int_scalar<betaIsZero>( &A[i*lda], sizeStride1A, &B[i*ldb], sizeStride1B, alpha, beta, plan->next);
    }else{
       // macro-kernel
-      const size_t lda_macro_ = plan->next->lda;
-      const size_t ldb_macro_ = plan->next->ldb;
+      const size_t lda_macro = plan->next->lda;
+      const size_t ldb_macro = plan->next->ldb;
       int i = plan->start;
       const size_t scalarRemainder = plan->end - plan->start;
       if( scalarRemainder > 0 ){
-         if( lda_ == 1)
-            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, scalarRemainder, &B[i*ldb_], ldb_macro_, sizeStride1B, alpha, beta);
-         else if( ldb_ == 1)
-            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, sizeStride1A, &B[i*ldb_], ldb_macro_, scalarRemainder, alpha, beta);
+         if( lda == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda], lda_macro, scalarRemainder, &B[i*ldb], ldb_macro, sizeStride1B, alpha, beta);
+         else if( ldb == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda], lda_macro, sizeStride1A, &B[i*ldb], ldb_macro, scalarRemainder, alpha, beta);
       }
    }
 }
@@ -591,8 +595,8 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
 {
    const int32_t end = plan->end - (plan->inc - 1);
    const int32_t inc = plan->inc;
-   const size_t lda_ = plan->lda;
-   const size_t ldb_ = plan->ldb;
+   const size_t lda = plan->lda;
+   const size_t ldb = plan->ldb;
 
    constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
    constexpr int blocking_ = blocking_micro_ * 4;
@@ -603,64 +607,64 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
-            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], &A[(i+1)*lda_], &B[i*ldb_], &B[(i+1)*ldb_], alpha, beta, plan->next);
+            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda], &A[(i+1)*lda], &B[i*ldb], &B[(i+1)*ldb], alpha, beta, plan->next);
          else
-            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+            transpose_int<blockingA, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda], Anext, &B[i*ldb], Bnext, alpha, beta, plan->next);
       }
       // remainder
       if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
-         if( lda_ == 1)
-            transpose_int<blocking_/2, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
-         else if( ldb_ == 1)
-            transpose_int<blockingA, blocking_/2, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+         if( lda == 1)
+            transpose_int<blocking_/2, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda], Anext, &B[i*ldb], Bnext, alpha, beta, plan->next);
+         else if( ldb == 1)
+            transpose_int<blockingA, blocking_/2, betaIsZero, floatType, useStreamingStores>( &A[i*lda], Anext, &B[i*ldb], Bnext, alpha, beta, plan->next);
          i+=blocking_/2;
       }
       if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
-         if( lda_ == 1)
-            transpose_int<blocking_/4, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
-         else if( ldb_ == 1)
-            transpose_int<blockingA, blocking_/4, betaIsZero, floatType, useStreamingStores>( &A[i*lda_], Anext, &B[i*ldb_], Bnext, alpha, beta, plan->next);
+         if( lda == 1)
+            transpose_int<blocking_/4, blockingB, betaIsZero, floatType, useStreamingStores>( &A[i*lda], Anext, &B[i*ldb], Bnext, alpha, beta, plan->next);
+         else if( ldb == 1)
+            transpose_int<blockingA, blocking_/4, betaIsZero, floatType, useStreamingStores>( &A[i*lda], Anext, &B[i*ldb], Bnext, alpha, beta, plan->next);
          i+=blocking_/4;
       }
       const size_t scalarRemainder = plan->end - i;
       if( scalarRemainder > 0 ){
-         if( lda_ == 1)
-            transpose_int_scalar<betaIsZero>( &A[i*lda_], scalarRemainder, &B[i*ldb_], -1, alpha, beta, plan->next);
+         if( lda == 1)
+            transpose_int_scalar<betaIsZero>( &A[i*lda], scalarRemainder, &B[i*ldb], -1, alpha, beta, plan->next);
          else
-            transpose_int_scalar<betaIsZero>( &A[i*lda_], -1, &B[i*ldb_], scalarRemainder, alpha, beta, plan->next);
+            transpose_int_scalar<betaIsZero>( &A[i*lda], -1, &B[i*ldb], scalarRemainder, alpha, beta, plan->next);
       }
    } else {
-      const size_t lda_macro_ = plan->next->lda;
-      const size_t ldb_macro_ = plan->next->ldb;
+      const size_t lda_macro = plan->next->lda;
+      const size_t ldb_macro = plan->next->ldb;
       // invoke macro-kernel
       
       int32_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
-            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], &A[(i+1)*lda_], lda_macro_, &B[i*ldb_], &B[(i+1)*ldb_], ldb_macro_, alpha, beta);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda], &A[(i+1)*lda], lda_macro, &B[i*ldb], &B[(i+1)*ldb], ldb_macro, alpha, beta);
          else
-            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+            macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda], Anext, lda_macro, &B[i*ldb], Bnext, ldb_macro, alpha, beta);
       // remainder
       if( blocking_/2 >= blocking_micro_ && (i + blocking_/2) <= plan->end ){
-         if( lda_ == 1)
-            macro_kernel<blocking_/2, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
-         else if( ldb_ == 1)
-            macro_kernel<blockingA, blocking_/2, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+         if( lda == 1)
+            macro_kernel<blocking_/2, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda], Anext, lda_macro, &B[i*ldb], Bnext, ldb_macro, alpha, beta);
+         else if( ldb == 1)
+            macro_kernel<blockingA, blocking_/2, betaIsZero,floatType, useStreamingStores>(&A[i*lda], Anext, lda_macro, &B[i*ldb], Bnext, ldb_macro, alpha, beta);
          i+=blocking_/2;
       }
       if( blocking_/4 >= blocking_micro_ && (i + blocking_/4) <= plan->end ){
-         if( lda_ == 1)
-            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
-         else if( ldb_ == 1)
-            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType, useStreamingStores>(&A[i*lda_], Anext, lda_macro_, &B[i*ldb_], Bnext, ldb_macro_, alpha, beta);
+         if( lda == 1)
+            macro_kernel<blocking_/4, blockingB, betaIsZero,floatType, useStreamingStores>(&A[i*lda], Anext, lda_macro, &B[i*ldb], Bnext, ldb_macro, alpha, beta);
+         else if( ldb == 1)
+            macro_kernel<blockingA, blocking_/4, betaIsZero,floatType, useStreamingStores>(&A[i*lda], Anext, lda_macro, &B[i*ldb], Bnext, ldb_macro, alpha, beta);
          i+=blocking_/4;
       }
       const size_t scalarRemainder = plan->end - i;
       if( scalarRemainder > 0 ){
-         if( lda_ == 1)
-            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, scalarRemainder, &B[i*ldb_], ldb_macro_, blockingB, alpha, beta);
-         else if( ldb_ == 1)
-            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda_], lda_macro_, blockingA, &B[i*ldb_], ldb_macro_, scalarRemainder, alpha, beta);
+         if( lda == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda], lda_macro, scalarRemainder, &B[i*ldb], ldb_macro, blockingB, alpha, beta);
+         else if( ldb == 1)
+            macro_kernel_scalar<betaIsZero,floatType>(&A[i*lda], lda_macro, blockingA, &B[i*ldb], ldb_macro, scalarRemainder, alpha, beta);
       }
    }
 }
@@ -671,13 +675,13 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
 {
    const int32_t end = plan->end - (plan->inc - 1);
    constexpr int32_t inc = 1; // TODO
-   const size_t lda_ = plan->lda;
-   const size_t ldb_ = plan->ldb;
+   const size_t lda = plan->lda;
+   const size_t ldb = plan->ldb;
 
    if( plan->next != nullptr )
       for(int i = plan->start; i < end; i+= inc)
          // recurse
-         transpose_int_constStride1<betaIsZero, floatType, useStreamingStores>( &A[i*lda_], &B[i*ldb_], alpha, beta, plan->next);
+         transpose_int_constStride1<betaIsZero, floatType, useStreamingStores>( &A[i*lda], &B[i*ldb], alpha, beta, plan->next);
    else 
       if( !betaIsZero )
       {
@@ -747,6 +751,9 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
 
          // initializes lda_ and ldb_
          computeLeadingDimensions();
+
+         // create plan
+         this->createPlan();
       }
 
       template<typename floatType>
@@ -1635,9 +1642,7 @@ void Transpose<floatType>::getBestLoopOrder( std::vector<int> &loopOrder ) const
             cost = (importanceA + importanceB * bias) * penalty;
          }
          costs[i + idx * dim_] = cost;
-//         printf("%e ",cost);
       }
-//      printf("\n");
    }
    std::list<int> availLoopLevels; //available rows
    std::list<int> availIndices;

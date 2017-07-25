@@ -10,6 +10,14 @@
 
 namespace hptt {
 
+/**
+ * \brief Determins the duration of the auto-tuning process.
+ *
+ * * ESTIMATE: 0 seconds (i.e., no auto-tuning)
+ * * MEASURE: 10 seconds
+ * * PATIENT: 60 seconds
+ * * CRAZY : 3600 seconds
+ */
 enum SelectionMethod { ESTIMATE, MEASURE, PATIENT, CRAZY };
 
 using FloatComplex = std::complex<float>;

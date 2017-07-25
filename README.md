@@ -22,6 +22,16 @@ transposition, and
     * Explicitly vectorized kernels for (AVX and ARM)
 * Support float, double, complex and double complex data types
 
+
+# Requirements
+
+You must have a working C++ compiler with c++11 support. I have tested HPTT with:
+
+* Intel's ICPC 15.0.3, 16.0.3, 17.0.2
+* GNU g++ 5.4, 6.2, 6.3
+* clang++ 3.8, 3.9
+
+
 # Install
 
 Clone the repository into a desired directory and change to that location:
@@ -69,13 +79,13 @@ The example above does not use any auto-tuning, but solely relies on HPTT's
 performance model. To active auto-tuning, please use hptt::MEASURE, or
 hptt::PATIENT instead of hptt::ESTIMATE.
 
-# Requirements
 
-You must have a working C++ compiler with c++11 support. I have tested HPTT with:
+# Documentation
 
-* Intel's ICPC 15.0.3, 16.0.3, 17.0.2
-* GNU g++ 5.4, 6.2, 6.3
-* clang++ 3.8, 3.9
+You can generate the doxygen documentation via
+
+    make doc
+
 
 # Benchmark
 

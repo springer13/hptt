@@ -45,5 +45,8 @@ all: ${OBJ}
 %.o: %.cpp
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
+doc:
+	doxygen
+
 clean:
 	rm -rf src/*.o lib/libhptt.so lib/libhptt.a
