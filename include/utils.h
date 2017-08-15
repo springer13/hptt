@@ -62,6 +62,9 @@ int findPos(t value, const std::vector<t> &array)
 int findPos(int value, const int *array, int n);
 
 int factorial(int n);
+
+void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *perm, 
+               int *tmpSizeA, int *tmpOuterSizeA, int *tmpouterSizeB, int *tmpPerm, const int dim, const bool useRowMajor);
 }
 
 

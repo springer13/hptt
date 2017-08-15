@@ -710,7 +710,8 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                  const floatType beta,
                  const SelectionMethod selectionMethod,
                  const int numThreads, 
-                 const int *threadIds) : 
+                 const int *threadIds, 
+                 const bool useRowMajor) : 
          A_(A),
          B_(B),
          alpha_(alpha),
@@ -726,6 +727,13 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
 #ifdef _OPENMP
          omp_init_lock(&writelock);
 #endif
+         int tmpPerm[dim];
+         int tmpSizeA[dim];
+         int tmpOuterSizeA[dim];
+         int tmpOuterSizeB[dim];
+         accountForRowMajor(sizeA, outerSizeA, outerSizeB, perm, 
+               tmpSizeA, tmpOuterSizeA, tmpOuterSizeB, tmpPerm, dim, useRowMajor); 
+
          sizeA_.resize(dim);
          perm_.resize(dim);
          outerSizeA_.resize(dim);
@@ -742,10 +750,10 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                threadIds_.push_back(i);
          }
 
-         verifyParameter(sizeA, perm, outerSizeA, outerSizeB, dim);
+         verifyParameter(tmpSizeA, tmpPerm, tmpOuterSizeA, tmpOuterSizeB, dim);
 
          // initializes dim_, outerSizeA, outerSizeB, sizeA and perm 
-         skipIndices(sizeA, perm, outerSizeA, outerSizeB, dim);
+         skipIndices(tmpSizeA, tmpPerm, tmpOuterSizeA, tmpOuterSizeB, dim);
          fuseIndices();
 
          // initializes lda_ and ldb_

@@ -16,8 +16,8 @@ parser.add_argument('--perm', metavar='perm', type=str, help="comma separated li
 parser.add_argument('--size', metavar='size', type=str, help="comma separated list of integers representing the size of the input tensor A")
 parser.add_argument('--rowMajor', action="store_true", help='Use row-major data layout (default: column-major)')
 parser.add_argument('--floatType', metavar='floatType', type=str, help="float type can be either 'double' or 'float' (default)")
-parser.add_argument('--alpha', type=float, help='alpha scalar')
-parser.add_argument('--beta', type=float, help='beta scalar')
+parser.add_argument('--alpha', type=float, help='alpha scalar (default: 1.0)')
+parser.add_argument('--beta', type=float, help='beta scalar (default: 0.0)')
 parser.add_argument('--clean', action="store_true", help='Clean output')
 #parser.print_help()
 
@@ -64,7 +64,7 @@ timeHPTT = 1e100
 for i in range(5):
    Mb = Ma *1.1 +  Mb #trash cache
    s = time.time()
-   hptt.tensorTransposeAndUpdate(perm,1.0,A,0.0,B)
+   hptt.tensorTransposeAndUpdate(perm, alpha, A, beta, B)
    #B = hptt.tensorTranspose(perm,1.0,A)
    timeHPTT = min(timeHPTT, time.time() - s)
 
@@ -73,6 +73,7 @@ for i in range(5):
    Mb = Ma *1.1 +  Mb #trash cache
    s = time.time()
    B_ = np.transpose(A, perm).copy(order=order)
+
    timeNP = min(timeNP, time.time() - s)
 
 if( not args.clean ):
@@ -86,7 +87,7 @@ else:
 OKGREEN = '\033[92m'
 FAIL = '\033[91m'
 ENDC = '\033[0m'
-if( not hptt.equal(B, B_,1000) ):
+if( beta == 0 and alpha == 1 and not hptt.equal(B, B_,1000) ):
     print B.shape
     print B_.shape
     print "validation:" + FAIL + " failed!!!" + ENDC

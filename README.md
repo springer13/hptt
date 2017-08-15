@@ -20,7 +20,8 @@ transposition, and
     * Parallelization
 * Multi architecture support
     * Explicitly vectorized kernels for (AVX and ARM)
-* Support float, double, complex and double complex data types
+* Supports float, double, complex and double complex data types
+* Supports both column-major and row-major data layouts
 
 HPTT now also offers C- and Python-interfaces (see below).
 
@@ -89,12 +90,12 @@ counter part since it does not expose control over the plan.
     void sTensorTranspose( const int *perm, const int dim,
             const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
             const float beta,        float *B,                   const int *outerSizeB, 
-            const int numThreads);
+            const int numThreads, const int useRowMajor);
 
     void dTensorTranspose( const int *perm, const int dim,
             const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
             const double beta,        double *B,                   const int *outerSizeB, 
-            const int numThreads);
+            const int numThreads, const int useRowMajor);
     ...
 
 ## Python-Interface
@@ -123,10 +124,10 @@ The python interface also offers support for:
 
 ### Python Benchmark
 
-You can find an elaborate example under ./pythonAPI/benchmark/benchmark.py
+You can find an elaborate example under ./pythonAPI/benchmark/benchmark.py --help
 
 * Multi-threaded 2x Intel Haswell-EP E5-2680 v3 (24 threads)
-** Comparison again [numpy.transpose](https://docs.scipy.org/doc/numpy/reference/generated/numpy.transpose.html)
+  * Comparison again [numpy.transpose](https://docs.scipy.org/doc/numpy/reference/generated/numpy.transpose.html)
 
 ![hptt](https://github.com/springer13/hptt/blob/master/misc/hptt_vs_numpy.png)
 

@@ -26,13 +26,6 @@ def randomNumaAwareInit( A ):
             ctypes.c_int32(A.ndim) )
 
 
-def convertPermColumnMajor(perm):
-    dim = len(perm)
-    permR = np.empty(dim, dtype=np.int32)
-    for i in xrange(dim):
-        permR[i] = dim - perm[dim-i-1] - 1
-    return permR
-
 def tensorTranspose( perm, alpha, A, numThreads=-1):
     """ 
         This function computes the tensor transposition of A.
@@ -58,15 +51,13 @@ def tensorTranspose( perm, alpha, A, numThreads=-1):
     if( numThreads < 0 ):
         numThreads = max(1, multiprocessing.cpu_count()/2)
     order = 'C'
+    useRowMajor = 1 
     if( A.flags['F_CONTIGUOUS'] ):
         order = 'F'
+        useRowMajor = 0
     Ashape = A.shape
     Bshape = [Ashape[i] for i in perm]
     B = np.empty(Bshape, dtype=A.dtype, order=order)
-    if( not A.flags['F_CONTIGUOUS'] ):
-        Ashape = Ashape[::-1]
-        Bshape = Bshape[::-1]
-        perm = convertPermColumnMajor( perm )
 
     permc = ctypes.cast((ctypes.c_int32 * len(perm))(*perm), ctypes.POINTER(ctypes.c_voidp))
     dataA = ctypes.c_void_p(A.ctypes.data)
@@ -81,12 +72,12 @@ def tensorTranspose( perm, alpha, A, numThreads=-1):
         HPTTlib.sTensorTranspose(permc, ctypes.c_int32(A.ndim),
                 ctypes.c_float(alpha), dataA, sizeA, outerSizeA,
                 ctypes.c_float(0.0),   dataB,        outerSizeB,
-                ctypes.c_int32(numThreads))
+                ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
     elif( A.dtype == 'float64' ):
         HPTTlib.dTensorTranspose(permc, ctypes.c_int32(A.ndim),
                 ctypes.c_double(alpha), dataA, sizeA, outerSizeA,
                 ctypes.c_double(0.0),   dataB,        outerSizeB,
-                ctypes.c_int32(numThreads))
+                ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
     elif( A.dtype == 'complex64' ):
         print "Data type not yet supported."
     elif( A.dtype == 'complex128' ):
@@ -128,14 +119,12 @@ def tensorTransposeAndUpdate( perm, alpha, A, beta, B, numThreads=-1):
         numThreads = max(1, multiprocessing.cpu_count()/2)
 
     order = 'C'
+    useRowMajor = 1
     if( A.flags['F_CONTIGUOUS'] ):
         order = 'F'
+        useRowMajor = 0
     Ashape = A.shape
     Bshape = B.shape
-    if( not A.flags['F_CONTIGUOUS'] ):
-        Ashape = Ashape[::-1]
-        Bshape = B.shape[::-1]
-        perm = convertPermColumnMajor( perm )
 
     permc = ctypes.cast((ctypes.c_int32 * len(perm))(*perm), ctypes.POINTER(ctypes.c_voidp))
     dataA = ctypes.c_void_p(A.ctypes.data)
@@ -149,12 +138,12 @@ def tensorTransposeAndUpdate( perm, alpha, A, beta, B, numThreads=-1):
         HPTTlib.sTensorTranspose(permc, ctypes.c_int32(A.ndim),
                 ctypes.c_float(alpha), dataA, sizeA, outerSizeA,
                 ctypes.c_float(beta),  dataB,        outerSizeB,
-                ctypes.c_int32(numThreads))
+                ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
     elif( A.dtype == 'float64' ):
         HPTTlib.dTensorTranspose(permc, ctypes.c_int32(A.ndim),
                 ctypes.c_double(alpha), dataA, sizeA, outerSizeA,
                 ctypes.c_double(beta),  dataB,        outerSizeB,
-                ctypes.c_int32(numThreads))
+                ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
     elif( A.dtype == 'complex64' ):
         print "Data type not yet supported."
     elif( A.dtype == 'complex128' ):

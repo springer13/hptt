@@ -46,6 +46,22 @@ int factorial(int n){
    return n * factorial(n-1);
 }
 
+void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *perm, 
+      int *tmpSizeA, int *tmpOuterSizeA, int *tmpOuterSizeB, int *tmpPerm, const int dim, const bool useRowMajor)
+{
+   for(int i=0; i < dim; ++i){
+      int idx = i;
+      if( useRowMajor ){
+         idx = dim - 1 - i; // reverse order
+         tmpPerm[i] = dim - perm[idx] - 1;
+      }else
+         tmpPerm[i] = perm[i];
+      tmpSizeA[i] = sizeA[idx]; 
+      tmpOuterSizeA[i] = outerSizeA[idx];
+      tmpOuterSizeB[i] = outerSizeB[idx];
+   }
+}
+
 }
 
 extern "C"

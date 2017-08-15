@@ -69,6 +69,9 @@ class Transpose
        * \param[in] threadIds Array of OpenMP threadIds that participate in this
        *            tensor transposition. This parameter is only important if you want to call
        *            HPTT from within a parallel region (i.e., via execute_expert()).
+       * \param[in] useRowMajor This flag indicates whether a row-major memory layout should be used (default: off = column-major).
+       *            Column-Major: indices are stored from left to right (leftmost = stride-1 index)
+       *            Row-Major: indices are stored from right to left (right = stride-1 index)
        */
       Transpose( const int *sizeA, 
                  const int *perm, 
@@ -81,7 +84,8 @@ class Transpose
                  const floatType beta,
                  const SelectionMethod selectionMethod,
                  const int numThreads, 
-                 const int *threadIds = nullptr);
+                 const int *threadIds = nullptr,
+                 const bool useRowMajor = false );
 
       Transpose(const Transpose &other);
 
