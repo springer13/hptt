@@ -22,6 +22,7 @@ transposition, and
     * Explicitly vectorized kernels for (AVX and ARM)
 * Support float, double, complex and double complex data types
 
+HPTT now also offers C- and Python-interfaces (see below).
 
 # Requirements
 
@@ -106,6 +107,13 @@ with the difference being that HPTT can also update the output tensor.
     tensorTranspose( perm, alpha, A, numThreads=-1)
 
 See docstring for additional information.
+
+Installation should be straight forward via:
+
+    cd ./pythonAPI
+    python setup.py install
+
+At this point you should be able to import the 'hptt' package within your python scripts.
 
 The python interface also offers support for:
 
