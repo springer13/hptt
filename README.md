@@ -120,7 +120,7 @@ You can find an elaborate example under ./pythonAPI/benchmark/benchmark.py
 * Multi-threaded 2x Intel Haswell-EP E5-2680 v3 (24 threads)
 ** Comparison again [numpy.transpose](https://docs.scipy.org/doc/numpy/reference/generated/numpy.transpose.html)
 
-![hptt](https://github.com/springer13/tcl/blob/master/misc/hptt_vs_numpy.png)
+![hptt](https://github.com/springer13/hptt/blob/master/misc/hptt_vs_numpy.png)
 
 # Documentation
 
