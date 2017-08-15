@@ -178,6 +178,11 @@ namespace hptt {
  *                       * If outerSizeA is not NULL, outerSizeB[i] >= perm(sizeA)[i] for all 0 <= i < dim must hold.
  *                       * This option enables HPTT to operate on sub-tensors.
  * \param[in] selectionMethod Determines if auto-tuning should be used. See hptt::SelectionMethod for details.
+ *                            ATTENTION: If you enable auto-tuning (e.g., hptt::MEASURE)
+ *                            then the output data will be used during the
+ *                            auto-tuning process. The original data (i.e., A and B), however, is preserved
+ *                            after this function call completes -- unless your input
+ *                            data (i.e. A) has invalid data (e.g., NaN, inf).
  * \param[in] numThreads number of threads that participate in this tensor transposition.
  * \param[in] threadIds Array of OpenMP threadIds that participate in this
  *            tensor transposition. This parameter is only important if you want to call
@@ -257,5 +262,53 @@ std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, c
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const int maxAutotuningCandidates,
                  const int numThreads, const int *threadIds = nullptr);
+}
 
+extern "C"
+{
+/**
+ * \brief Computes the out-of-place tensor transposition of A into B
+ *
+ * A tensor transposition plan is a data structure that encodes the execution of the tensor transposition.
+ * HPTT supports tensor transpositions of the form: 
+ * \f[ B_{\pi(i_0,i_1,...)} = \alpha * A_{i_0,i_1,...} + \beta * B_{\pi(i_0,i_1,...)}. \f]
+ * The plan can be reused over several transpositions.
+ *
+ * \param[in] perm dim-dimensional array representing the permutation of the indices. 
+ *                 * For instance, perm[] = {1,0,2} denotes the following transposition: \f$B_{i1,i0,i2} \gets A_{i0,i1,i2}\f$.
+ * \param[in] dim Dimensionality of the tensors
+ * \param[in] alpha scaling factor for A
+ * \param[in] A Pointer to the raw-data of the input tensor A
+ * \param[in] sizeA dim-dimensional array that stores the sizes of each dimension of A 
+ * \param[in] outerSizeA dim-dimensional array that stores the outer-sizes of each dimension of A.
+ *                       * This parameter may be NULL, indicating that the outer-size is equal to sizeA. 
+ *                       * If outerSizeA is not NULL, outerSizeA[i] >= sizeA[i] for all 0 <= i < dim must hold.
+ *                       * This option enables HPTT to operate on sub-tensors.
+ * \param[in] beta scaling factor for B
+ * \param[inout] B Pointer to the raw-data of the output tensor B
+ * \param[in] outerSizeB dim-dimensional array that stores the outer-sizes of each dimension of B.
+ *                       * This parameter may be NULL, indicating that the outer-size is equal to the perm(sizeA). 
+ *                       * If outerSizeA is not NULL, outerSizeB[i] >= perm(sizeA)[i] for all 0 <= i < dim must hold.
+ *                       * This option enables HPTT to operate on sub-tensors.
+ * \param[in] numThreads number of threads that participate in this tensor transposition.
+ */
+void sTensorTranspose( const int *perm, const int dim,
+                 const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+                 const float beta,        float *B,                   const int *outerSizeB, 
+                 const int numThreads);
+
+void dTensorTranspose( const int *perm, const int dim,
+                 const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+                 const double beta,        double *B,                   const int *outerSizeB, 
+                 const int numThreads);
+
+void cTensorTranspose( const int *perm, const int dim,
+                 const float _Complex alpha, const float _Complex *A, const int *sizeA, const int *outerSizeA, 
+                 const float _Complex beta,        float _Complex *B,                   const int *outerSizeB, 
+                 const int numThreads);
+
+void zTensorTranspose( const int *perm, const int dim,
+                 const double _Complex alpha, const double _Complex *A, const int *sizeA, const int *outerSizeA, 
+                 const double _Complex beta,        double _Complex *B,                   const int *outerSizeB, 
+                 const int numThreads);
 }

@@ -80,6 +80,25 @@ performance model. To active auto-tuning, please use hptt::MEASURE, or
 hptt::PATIENT instead of hptt::ESTIMATE.
 
 
+## C-Interface
+
+HPTT also offeres a C-interface. This interface is less expressive than its C++
+counter part since it does not expose control over the plan.
+
+    void sTensorTranspose( const int *perm, const int dim,
+            const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
+            const float beta,        float *B,                   const int *outerSizeB, 
+            const int numThreads);
+
+    void dTensorTranspose( const int *perm, const int dim,
+            const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
+            const double beta,        double *B,                   const int *outerSizeB, 
+            const int numThreads);
+    ...
+
+
+See documentation for more details.
+
 # Documentation
 
 You can generate the doxygen documentation via

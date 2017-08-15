@@ -60,6 +60,11 @@ class Transpose
        *                       * If outerSizeA is not NULL, outerSizeB[i] >= perm(sizeA)[i] for all 0 <= i < dim must hold.
        *                       * This option enables HPTT to operate on sub-tensors.
        * \param[in] selectionMethod Determines if auto-tuning should be used. See hptt::SelectionMethod for details.
+       *                            ATTENTION: If you enable auto-tuning (e.g., hptt::MEASURE)
+       *                            then the output data will be used during the
+       *                            auto-tuning process. The original data (i.e., A and B), however, is preserved
+       *                            after this function call completes -- unless your input
+       *                            data (i.e. A) has invalid data (e.g., NaN, inf).
        * \param[in] numThreads number of threads that participate in this tensor transposition.
        * \param[in] threadIds Array of OpenMP threadIds that participate in this
        *            tensor transposition. This parameter is only important if you want to call
