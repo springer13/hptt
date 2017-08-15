@@ -96,8 +96,31 @@ counter part since it does not expose control over the plan.
             const int numThreads);
     ...
 
+## Python-Interface
 
-See documentation for more details.
+HPTT now also offers a python-interface. The functionality offered by HPTT is comparable to [numpy.transpose](https://docs.scipy.org/doc/numpy/reference/generated/numpy.transpose.html)
+with the difference being that HPTT can also update the output tensor.
+
+    tensorTransposeAndUpdate( perm, alpha, A, beta, B, numThreads=-1)
+
+    tensorTranspose( perm, alpha, A, numThreads=-1)
+
+See docstring for additional information.
+
+The python interface also offers support for:
+
+* Single and double precision
+* Column-major and row-major data layouts
+* multi-threading support (HPTT by default utilizes all cores of a system)
+
+### Python Benchmark
+
+You can find an elaborate example under ./pythonAPI/benchmark/benchmark.py
+
+* Multi-threaded 2x Intel Haswell-EP E5-2680 v3 (24 threads)
+** Comparison again [numpy.transpose](https://docs.scipy.org/doc/numpy/reference/generated/numpy.transpose.html)
+
+![hptt](https://github.com/springer13/tcl/blob/master/misc/hptt_vs_numpy.png)
 
 # Documentation
 
