@@ -163,7 +163,7 @@ def equal(A, B, numSamples=-1):
     error = 0
     samples = range(A.size)
     if( numSamples != -1 ):
-        samples = random.sample(samples, numSamples)
+        samples = random.sample(samples, min(A.size,numSamples))
 
     for i in samples:
       Aabs = abs(A[i]);

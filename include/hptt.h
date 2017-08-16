@@ -193,50 +193,50 @@ std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int
                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
                  const float beta, float *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
                  const double beta, double *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
                  const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 
 std::shared_ptr<hptt::Transpose<float> > create_plan( const std::vector<int> &perm, const int dim,
                  const float alpha, const float *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
                  const float beta, float *B, const std::vector<int> &outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const std::vector<int> &threadIds = {}, const int useRowMajor = false);
+                 const int numThreads, const std::vector<int> &threadIds = {}, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const std::vector<int> &perm, const int dim,
                  const double alpha, const double *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
                  const double beta, double *B, const std::vector<int> &outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const std::vector<int> &threadIds = {}, const int useRowMajor = false);
+                 const int numThreads, const std::vector<int> &threadIds = {}, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const std::vector<int> &perm, const int dim,
                  const FloatComplex alpha, const FloatComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
                  const FloatComplex beta, FloatComplex *B, const std::vector<int> &outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const std::vector<int> &threadIds = {}, const int useRowMajor = false);
+                 const int numThreads, const std::vector<int> &threadIds = {}, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const std::vector<int> &perm, const int dim,
                  const DoubleComplex alpha, const DoubleComplex *A, const std::vector<int> &sizeA, const std::vector<int> &outerSizeA, 
                  const DoubleComplex beta, DoubleComplex *B, const std::vector<int> &outerSizeB, 
                  const SelectionMethod selectionMethod,
-                 const int numThreads, const std::vector<int> &threadIds = {}, const int useRowMajor = false);
+                 const int numThreads, const std::vector<int> &threadIds = {}, const bool useRowMajor = false);
 
 
 
@@ -244,25 +244,25 @@ std::shared_ptr<hptt::Transpose<float> > create_plan( const int *perm, const int
                  const float alpha, const float *A, const int *sizeA, const int *outerSizeA, 
                  const float beta, float *B, const int *outerSizeB, 
                  const int maxAutotuningCandidates,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<double> > create_plan( const int *perm, const int dim,
                  const double alpha, const double *A, const int *sizeA, const int *outerSizeA, 
                  const double beta, double *B, const int *outerSizeB, 
                  const int maxAutotuningCandidates,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<FloatComplex> > create_plan( const int *perm, const int dim,
                  const FloatComplex alpha, const FloatComplex *A, const int *sizeA, const int *outerSizeA, 
                  const FloatComplex beta, FloatComplex *B, const int *outerSizeB, 
                  const int maxAutotuningCandidates,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 
 std::shared_ptr<hptt::Transpose<DoubleComplex> > create_plan( const int *perm, const int dim,
                  const DoubleComplex alpha, const DoubleComplex *A, const int *sizeA, const int *outerSizeA, 
                  const DoubleComplex beta, DoubleComplex *B, const int *outerSizeB, 
                  const int maxAutotuningCandidates,
-                 const int numThreads, const int *threadIds = nullptr, const int useRowMajor = false);
+                 const int numThreads, const int *threadIds = nullptr, const bool useRowMajor = false);
 }
 
 extern "C"
