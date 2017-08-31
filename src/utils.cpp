@@ -57,8 +57,15 @@ void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *oute
       }else
          tmpPerm[i] = perm[i];
       tmpSizeA[i] = sizeA[idx]; 
-      tmpOuterSizeA[i] = outerSizeA[idx];
-      tmpOuterSizeB[i] = outerSizeB[idx];
+
+      if( outerSizeA == nullptr )
+         tmpOuterSizeA[i] = sizeA[idx];
+      else
+         tmpOuterSizeA[i] = outerSizeA[idx];
+      if( outerSizeB == nullptr )
+         tmpOuterSizeB[i] = sizeA[perm[idx]];
+      else
+         tmpOuterSizeB[i] = outerSizeB[idx];
    }
 }
 
