@@ -94,6 +94,8 @@ class Transpose
       /***************************************************
        * Getter & Setter
        ***************************************************/
+      bool getConjA() noexcept { return conjA_; }
+      void setConjA(bool conjA) noexcept { conjA_ = conjA; }
       int getNumThreads() const noexcept { return numThreads_; }
       void setNumThreads(int numThreads) noexcept { numThreads_ = numThreads; }
       floatType getAlpha() const noexcept { return alpha_; }
@@ -258,6 +260,7 @@ class Transpose
       int numThreads_;
       int selectedParallelStrategyId_;
       int selectedLoopOrderId_;
+      bool conjA_;
 #ifdef _OPENMP
       omp_lock_t writelock;
 #endif

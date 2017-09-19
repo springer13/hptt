@@ -19,7 +19,6 @@
 
 #include "defines.h"
 #include "reference.h"
-typedef float floatType;
 
 void trashCache(double *A, double *B, int n)
 {
@@ -87,7 +86,7 @@ int main(int argc, char *argv[])
   printf("numThreads: %d\n",numThreads);
   floatType alpha = 2.;
   floatType beta = 4.;
-  //beta = 0; 
+//  beta = 0; 
 
   if( argc < 2 ){
      printf("Usage: <dim> <permutation each index separated by ' '> <size of each index separated by ' '>\n");
@@ -172,6 +171,7 @@ int main(int argc, char *argv[])
            alpha, A, size_, NULL, 
            beta, B_proto, NULL, 
            hptt::ESTIMATE, numThreads);
+//     plan->setConjA(true);
 
      double minTime = 1e200;
      for(int i=0;i < nRepeat ; ++i){
@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
         restore(B, B_ref, total_size);
         trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
-        transpose_ref( size, perm, dim, A, alpha, B_ref, beta);
+        transpose_ref( size, perm, dim, A, alpha, B_ref, beta, false);
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }

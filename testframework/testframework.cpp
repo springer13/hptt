@@ -155,7 +155,7 @@ void runTests()
             hptt::ESTIMATE, numThreads);
 
       restore(B, B_ref, total_size);
-      transpose_ref<floatType>( size, perm, dim, A, alpha, B_ref, beta);
+      transpose_ref<floatType>( size, perm, dim, A, alpha, B_ref, beta, false);
 
       restore(B, B_hptt, total_size);
       plan->execute();

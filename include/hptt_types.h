@@ -12,7 +12,7 @@
 namespace hptt {
 
 /**
- * \brief Determins the duration of the auto-tuning process.
+ * \brief Determines the duration of the auto-tuning process.
  *
  * * ESTIMATE: 0 seconds (i.e., no auto-tuning)
  * * MEASURE: 10 seconds

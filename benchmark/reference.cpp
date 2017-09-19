@@ -17,7 +17,7 @@
 template<typename floatType>
 void transpose_ref( uint32_t *size, uint32_t *perm, int dim, 
       const floatType* __restrict__ A, floatType alpha, 
-      floatType* __restrict__ B, floatType beta)
+      floatType* __restrict__ B, floatType beta, const bool conjA)
 {
    // compute stride for all dimensions w.r.t. A
    uint32_t strideA[dim];
@@ -56,22 +56,28 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim,
 
       if( beta == (floatType) 0 )
          for(int i=0; i < sizeInner; ++i)
-            B_[i] = alpha * A_[i * strideAinner];
+            if( conjA )
+               B_[i] = alpha * std::conj(A_[i * strideAinner]);
+            else
+               B_[i] = alpha * A_[i * strideAinner];
       else
          for(int i=0; i < sizeInner; ++i)
-            B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
+            if( conjA )
+               B_[i] = alpha * std::conj(A_[i * strideAinner]) + beta * B_[i];
+            else
+               B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
    }
 }
 
 template void transpose_ref<float>( uint32_t *size, uint32_t *perm, int dim, 
       const float* __restrict__ A, float alpha, 
-      float* __restrict__ B, float beta);
+      float* __restrict__ B, float beta, const bool conjA);
 template void transpose_ref<FloatComplex>( uint32_t *size, uint32_t *perm, int dim, 
       const FloatComplex* __restrict__ A, FloatComplex alpha, 
-      FloatComplex* __restrict__ B, FloatComplex beta);
+      FloatComplex* __restrict__ B, FloatComplex beta, const bool conjA);
 template void transpose_ref<double>( uint32_t *size, uint32_t *perm, int dim, 
       const double* __restrict__ A, double alpha, 
-      double* __restrict__ B, double beta);
+      double* __restrict__ B, double beta, const bool conjA);
 template void transpose_ref<DoubleComplex>( uint32_t *size, uint32_t *perm, int dim, 
       const DoubleComplex* __restrict__ A, DoubleComplex alpha, 
-      DoubleComplex* __restrict__ B, DoubleComplex beta);
+      DoubleComplex* __restrict__ B, DoubleComplex beta, const bool conjA);
