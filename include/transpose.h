@@ -202,6 +202,8 @@ class Transpose
        */
       void execute() noexcept;
 
+      void print() noexcept;
+
    private:
       /***************************************************
        * Private Methods
@@ -233,7 +235,7 @@ class Transpose
       float estimateExecutionTime( const std::shared_ptr<Plan> plan); //execute just a few iterations and extrapolate the result
       void verifyParameter(const int *size, const int* perm, const int* outerSizeA, const int* outerSizeB, const int dim) const;
       void getBestParallelismStrategy ( std::vector<int> &bestParallelismStrategy ) const;
-      void getBestLoopOrder( std::vector<int> &loopOrder ) const;
+      void getBestLoopOrder( std::vector<int> &loopOrder ) const; //innermost loop idx is stored at dim_-1
       void getLoopOrders(std::vector<std::vector<int> > &loopOrders) const;
       void getParallelismStrategies(std::vector<std::vector<int> > &parallelismStrategies) const;
       void getAllParallelismStrategies( std::list<int> &primeFactorsToMatch, 

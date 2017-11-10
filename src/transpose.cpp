@@ -1054,6 +1054,12 @@ void Transpose<floatType>::execute() noexcept
    }
 }
 
+template<typename floatType> 
+void Transpose<floatType>::print() noexcept 
+{ 
+   masterPlan_->print(); 
+}
+
 template<typename floatType>
 int Transpose<floatType>::getIncrement( int loopIdx ) const
 {
@@ -1703,6 +1709,22 @@ void Transpose<floatType>::fuseIndices()
 template<typename floatType>
 void Transpose<floatType>::getBestLoopOrder( std::vector<int> &loopOrder ) const
 {
+   auto totalOuterSizeA = std::accumulate(outerSizeA_.begin(), outerSizeA_.end(), 1, std::multiplies<size_t>()) * sizeof(floatType);
+   auto totalOuterSizeB = std::accumulate(outerSizeB_.begin(), outerSizeB_.end(), 1, std::multiplies<size_t>()) * sizeof(floatType);
+   if( totalOuterSizeA > totalOuterSizeB && totalOuterSizeB <= 22 * 1024. * 1024. ) // B is likely to fit into L3 cache
+   {
+      // prefer accesses to A over those to B (Rationale: reduce TLB misses)
+      for(int i=0;i < dim_ ; ++i) 
+         loopOrder[dim_-1-i] = i; //innermost loop idx is stored at dim_-1
+      return;
+   }else if( totalOuterSizeB > totalOuterSizeA && totalOuterSizeA <= 22 * 1024. * 1024. ) // B is likely to fit into L3 cache
+   {
+      // prefer accesses to B over those to A (Rationale: reduce TLB misses)
+      for(int i=0;i < dim_ ; ++i) 
+         loopOrder[dim_-1-i] = dim_-1-i; //innermost loop idx is stored at dim_-1
+      return;
+   }
+
    // create cost matrix; cost[i,idx] === cost for idx being at loop-level i
    double costs[dim_*dim_];
    for(int i=0;i < dim_ ; ++i){
