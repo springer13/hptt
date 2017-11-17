@@ -13,6 +13,19 @@
 namespace hptt {
   
 template<typename floatType>
+static floatType conj(floatType x){
+   return std::conj(x);
+}
+template<>
+float conj(float x){
+   return x;
+}
+template<>
+double conj(double x){
+   return x;
+}
+
+template<typename floatType>
 static double getZeroThreshold();
 template<>
 double getZeroThreshold<double>() { return 1e-16;}

@@ -42,14 +42,14 @@ struct micro_kernel
           for(int j=0; j < n; ++j)
              for(int i=0; i < n; ++i)
                 if( conjA )
-                   B[i + j * ldb] = alpha * std::conj(A[i * lda + j]);
+                   B[i + j * ldb] = alpha * conj(A[i * lda + j]);
                 else
                    B[i + j * ldb] = alpha * A[i * lda + j];
        else
           for(int j=0; j < n; ++j)
              for(int i=0; i < n; ++i)
                 if( conjA )
-                   B[i + j * ldb] = alpha * std::conj(A[i * lda + j]) + beta * B[i + j * ldb];
+                   B[i + j * ldb] = alpha * conj(A[i * lda + j]) + beta * B[i + j * ldb];
                 else
                    B[i + j * ldb] = alpha * A[i * lda + j] + beta * B[i + j * ldb];
     }
@@ -380,14 +380,14 @@ static INLINE void macro_kernel_scalar(const floatType* __restrict__ A, const si
       for(int j=0; j < blockingA; ++j)
          for(int i=0; i < blockingB; ++i)
             if( conjA )
-               B[i + j * ldb] = alpha * std::conj(A[i * lda + j]);
+               B[i + j * ldb] = alpha * conj(A[i * lda + j]);
             else
                B[i + j * ldb] = alpha * A[i * lda + j];
    else
       for(int j=0; j < blockingA; ++j)
          for(int i=0; i < blockingB; ++i)
             if( conjA )
-               B[i + j * ldb] = alpha * std::conj(A[i * lda + j]) + beta * B[i + j * ldb];
+               B[i + j * ldb] = alpha * conj(A[i * lda + j]) + beta * B[i + j * ldb];
             else
                B[i + j * ldb] = alpha * A[i * lda + j] + beta * B[i + j * ldb];
 }
@@ -698,7 +698,7 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
       {
          for(int32_t i = plan->start; i < end; i+= inc)
             if( conjA )
-               B[i] = alpha * std::conj(A[i]) + beta * B[i];
+               B[i] = alpha * conj(A[i]) + beta * B[i];
             else
                B[i] = alpha * A[i] + beta * B[i];
       } else {
@@ -706,7 +706,7 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
             if( conjA )
 #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
-                  B[i] = alpha * std::conj(A[i]);
+                  B[i] = alpha * conj(A[i]);
             else
 #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
@@ -714,7 +714,7 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
          else
             if( conjA )
                for(int32_t i = plan->start; i < end; i+= inc)
-                  B[i] = alpha * std::conj(A[i]);
+                  B[i] = alpha * conj(A[i]);
             else
                for(int32_t i = plan->start; i < end; i+= inc)
                   B[i] = alpha * A[i];
@@ -874,7 +874,7 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
       HPTT_DUPLICATE(spawnThreads,
          for(int32_t i = myStart; i < myEnd; i++)
             if( conjA )
-               B[i] = alpha * std::conj(A[i]) + beta * B[i];
+               B[i] = alpha * conj(A[i]) + beta * B[i];
             else
                B[i] = alpha * A[i] + beta * B[i];
       )
@@ -884,7 +884,7 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t i = myStart; i < myEnd; i++)
                if( conjA )
-                  B[i] = alpha * std::conj(A[i]);
+                  B[i] = alpha * conj(A[i]);
                else
                   B[i] = alpha * A[i];
          )
@@ -892,7 +892,7 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t i = myStart; i < myEnd; i++)
                if( conjA )
-                  B[i] = alpha * std::conj(A[i]);
+                  B[i] = alpha * conj(A[i]);
                else
                   B[i] = alpha * A[i];
          )
@@ -910,7 +910,7 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
          for(int32_t j = myStart; j < myEnd; j++)
             for(int32_t i = 0; i < n0; i++)
                if( conjA )
-                  B[i + j * ldb] = alpha * std::conj(A[i + j * lda]) + beta * B[i + j * ldb];
+                  B[i + j * ldb] = alpha * conj(A[i + j * lda]) + beta * B[i + j * ldb];
                else
                   B[i + j * ldb] = alpha * A[i + j * lda] + beta * B[i + j * ldb];
       )
@@ -921,7 +921,7 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
 _Pragma("vector nontemporal")
             for(int32_t i = 0; i < n0; i++)
                if( conjA )
-                  B[i + j * ldb] = alpha * std::conj(A[i + j * lda]);
+                  B[i + j * ldb] = alpha * conj(A[i + j * lda]);
                else
                   B[i + j * ldb] = alpha * A[i + j * lda];
          )
@@ -930,7 +930,7 @@ _Pragma("vector nontemporal")
             for(int32_t j = myStart; j < myEnd; j++)
                for(int32_t i = 0; i < n0; i++)
                   if( conjA )
-                     B[i + j * ldb] = alpha * std::conj(A[i + j * lda]);
+                     B[i + j * ldb] = alpha * conj(A[i + j * lda]);
                   else
                      B[i + j * ldb] = alpha * A[i + j * lda];
          )
