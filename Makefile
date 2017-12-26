@@ -1,4 +1,4 @@
-CXX_FLAGS=-O3 -std=c++11 -fPIC -DNDEBUG
+CXX_FLAGS=-O3 -std=c++11 -DNDEBUG
 INCLUDE_PATH=-I./include/
 
 ifeq ($(CXX),icpc)
@@ -36,17 +36,26 @@ scalar2: all
 
 SRC=$(wildcard ./src/*.cpp)
 OBJ=$(SRC:.cpp=.o)
+SHARED_OBJ=$(SRC:.cpp=.so)
 
-all: ${OBJ}
+all: lib/libhptt.so lib/libhptt.a
+
+lib/libhptt.so: ${SHARED_OBJ}
 	mkdir -p lib
-	${CXX} ${OBJ} ${CXX_FLAGS} -o lib/libhptt.so -shared
+	${CXX} ${SHARED_OBJ} ${CXX_FLAGS} -o lib/libhptt.so -shared
+
+lib/libhptt.a: ${OBJ}
+	mkdir -p lib
 	ar rvs lib/libhptt.a ${OBJ}
 
 %.o: %.cpp
 	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
+%.so: %.cpp
+	${CXX} ${CXX_FLAGS} -fPIC ${INCLUDE_PATH} -c $< -o $@
+
 doc:
 	doxygen
 
 clean:
-	rm -rf src/*.o lib/libhptt.so lib/libhptt.a
+	rm -rf ${OBJ} ${SHARED_OBJ} lib/libhptt.so lib/libhptt.a
