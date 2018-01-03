@@ -166,10 +166,18 @@ See [(pdf)](https://arxiv.org/abs/1704.04374) for details.
 * Add explicit vectorization for IBM power
 * Add explicit vectorization for complex types
 
-# License
 
-This project is under LGPLv3 for now. If this license is too restrictive for you,
-please feel free to contact me via email (springer@aices.rwth-aachen.de).
+# Related Projects
+
+* Shared-Memory Tensor Contractions: 
+    * [TCL](https://github.com/springer13/tcl)
+    * [TBLIS](https://github.com/devinamatthews/tblis)
+* Distributed-Memory Tensor Contractions:
+    * [CTF](https://github.com/cyclops-community/ctf)
+    * [libtensor](https://github.com/epifanovsky/libtensor)
+* Tensor network codes:
+    * [ITensor](http://itensor.org/)
+    * [Uni10](http://yingjerkao.github.io/uni10/)
 
 # Citation
 
