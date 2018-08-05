@@ -18,6 +18,14 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -qsmp=omp)
 endif()
 
+if(ENABLE_AVX)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mavx -DHPTT_ARCH_AVX)
+elseif(ENABLE_ARM)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mfpu=neon -DHPTT_ARCH_ARM)
+elseif(ENABLE_IBM)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mcpu=power7 -DHPTT_ARCH_IBM -maltivec -mabi=altivec)
+endif()
+
 set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
 
 add_library(hptt STATIC ${HPTT_SRCS})

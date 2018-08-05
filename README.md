@@ -48,6 +48,11 @@ Now you have several options to build the desired version of the library:
     make arm
     make scalar
 
+Using CMake:
+    mkdir build && cd build
+    cmake .. -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
+    #Optionally one of [-DENABLE_ARM=ON -DENABLE_AVX=ON -DENABLE_IBM=ON]    
+
 This should create 'libhptt.so' inside the ./lib folder.
 
 
