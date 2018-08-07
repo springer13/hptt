@@ -8,3 +8,9 @@ data/
 html/
 latex/
 old/
+
+*.a
+*.so
+pythonAPI/hptt/__pycache__/
+pythonAPI/hptt\.egg-info/
+pythonAPI/hptt/hptt\.cfg
