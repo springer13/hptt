@@ -107,14 +107,20 @@ with the difference being that HPTT can also update the output tensor.
 
     tensorTranspose( perm, alpha, A, numThreads=-1)
 
-See docstring for additional information.
+See docstring for additional information. There is also the drop-in ``numpy.transpose`` replacement which calls these functions for you:
+
+    hptt.transpose(A, axes)
 
 Installation should be straight forward via:
 
     cd ./pythonAPI
     python setup.py install
 
-At this point you should be able to import the 'hptt' package within your python scripts.
+or 
+
+    pip install -U .
+
+if you want a ``pip`` managed install. At this point you should be able to import the 'hptt' package within your python scripts.
 
 The python interface also offers support for:
 
