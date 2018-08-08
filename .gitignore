@@ -11,6 +11,9 @@ old/
 
 *.a
 *.so
-pythonAPI/hptt/__pycache__/
-pythonAPI/hptt\.egg-info/
-pythonAPI/hptt/hptt\.cfg
+
+**/__pycache__
+**/.pytest_cache
+**/*\.egg-info/
+**/hptt\.cfg
+
