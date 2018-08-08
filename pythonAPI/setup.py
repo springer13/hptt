@@ -44,6 +44,10 @@ setup(
     author_email="springer@aices.rwth-aachen.de",
     packages=["hptt"],
     package_data={'hptt': ['hptt.cfg']},
+    install_requires=[
+        'numpy',
+        'psutil',
+    ]
 )
 
 print("")
