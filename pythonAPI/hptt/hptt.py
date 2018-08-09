@@ -143,7 +143,7 @@ def tensorTranspose(perm, alpha, A, numThreads=-1):
         would be represented as: tensorTranspose([2,1,0], 1.3, A).
 
     """
-    order = 'C' if A.flags['C_CONTIGUOUS'] else 'F'
+    order = 'F' if A.flags['F_CONTIGUOUS'] else 'C'
     B = np.empty([A.shape[i] for i in perm], dtype=A.dtype, order=order)
 
     tensorTransposeAndUpdate(perm, alpha, A, 0.0, B, numThreads=numThreads)
@@ -171,6 +171,61 @@ def transpose(a, axes=None):
         axes = reversed(range(a.ndim))
 
     return tensorTranspose(axes, 1.0, a)
+
+
+def ascontiguousarray(a):
+    """Return a contiguous array in memory (C order).
+
+    Parameters
+    ----------
+    a : array_like
+        Input array.
+
+    Returns
+    -------
+    out : ndarray
+        Contiguous array of same shape and content as `a`.
+    """
+    if a.flags['C_CONTIGUOUS']:
+        return a
+
+    # rewind the numpy array into it's 'original' contiguous form
+    bperm = [a.strides.index(s) for s in sorted(a.strides, reverse=True)]
+
+    # use numpy to do this lazy transposition
+    at = a.transpose(bperm)
+
+    # can now use hptt to actively perform the tranpose
+    fperm = [bperm.index(p) for p in range(a.ndim)]
+    return transpose(at, fperm)
+
+
+def asfortranarray(a):
+    """Return an array laid out in Fortran order in memory.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array.
+
+    Returns
+    -------
+    out : ndarray
+       The input ``a`` in Fortran, or column-major, order.
+    """
+    if a.flags['F_CONTIGUOUS']:
+        return a
+
+    # rewind the numpy array into it's 'original' F-contiguous form
+    bperm = [a.strides.index(s) for s in sorted(a.strides)]
+
+    # use numpy to do this lazy transposition
+    at = a.transpose(bperm)
+
+    # can now use hptt to actively perform the tranpose
+    fperm = [bperm.index(p) for p in range(a.ndim)]
+
+    return transpose(at, fperm)
 
 
 def equal(A, B, numSamples=-1):

@@ -107,9 +107,11 @@ with the difference being that HPTT can also update the output tensor.
 
     tensorTranspose( perm, alpha, A, numThreads=-1)
 
-See docstring for additional information. There is also the drop-in ``numpy.transpose`` replacement which calls these functions for you:
+See docstring for additional information. Based on those there are also the following drop-in replacements for ``numpy`` functions:
 
     hptt.transpose(A, axes)
+    hptt.ascontiguousarray(A)
+    hptt.asfortranarray(A)
 
 Installation should be straight forward via:
 
