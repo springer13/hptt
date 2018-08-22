@@ -8,3 +8,12 @@ data/
 html/
 latex/
 old/
+
+*.a
+*.so
+
+**/__pycache__
+**/.pytest_cache
+**/*\.egg-info/
+**/hptt\.cfg
+
