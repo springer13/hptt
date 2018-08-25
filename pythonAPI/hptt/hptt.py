@@ -117,7 +117,7 @@ def tensorTransposeAndUpdate(perm, alpha, A, beta, B, numThreads=-1):
     # tranpose!
     tranpose_fn(permc, ctypes.c_int32(A.ndim),
                 scalar_fn(alpha), dataA, sizeA, outerSizeA,
-                scalar_fn(0.0), dataB, outerSizeB,
+                scalar_fn(beta), dataB, outerSizeB,
                 ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
 
 
