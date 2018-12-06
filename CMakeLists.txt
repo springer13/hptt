@@ -32,7 +32,7 @@ if(ENABLE_AVX)
 elseif(ENABLE_ARM)
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mfpu=neon -DHPTT_ARCH_ARM)
 elseif(ENABLE_IBM)
-  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mcpu=native -mtune=native -DHPTT_ARCH_IBM -maltivec -mabi=altivec)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mtune=native -DHPTT_ARCH_IBM -maltivec -mabi=altivec)
 endif()
 
 set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
