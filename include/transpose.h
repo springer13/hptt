@@ -153,14 +153,14 @@ class Transpose
        *
        * \param[in] threadId An OpenMP threadId 
        */
-      void addThreadId(int threadId) noexcept { 
 #ifdef _OPENMP
+      void addThreadId(int threadId) noexcept { 
          omp_set_lock(&writelock);
          threadIds_.push_back(threadId); 
          std::sort(threadIds_.begin(), threadIds_.end()); 
          omp_unset_lock(&writelock);
-#endif
       }
+#endif
 
       void printThreadIds() const noexcept { for( auto id : threadIds_) printf("%d, ",id); printf("\n"); } 
       int getMasterThreadId() const noexcept { return threadIds_[0]; } 
