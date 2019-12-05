@@ -50,6 +50,11 @@ add_library(hptt STATIC ${HPTT_SRCS})
 target_compile_features(hptt PUBLIC cxx_std_11)
 target_include_directories(hptt PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #target_compile_definitions(hptt PRIVATE ${HPTT_CXX_COMPILE_DEFS})
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -O2)
+endif()
+
 target_compile_options(hptt PUBLIC ${HPTT_CXX_FLAGS})
 
 install(TARGETS hptt
