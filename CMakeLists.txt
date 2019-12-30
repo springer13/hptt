@@ -51,7 +51,7 @@ target_compile_features(hptt PUBLIC cxx_std_11)
 target_include_directories(hptt PUBLIC ${PROJECT_SOURCE_DIR}/include)
 #target_compile_definitions(hptt PRIVATE ${HPTT_CXX_COMPILE_DEFS})
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "9.1")
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -O2)
 endif()
 
