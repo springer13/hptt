@@ -1,11 +1,15 @@
 
-cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
-project (HPTT C CXX)
+cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+project (HPTT VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(ENABLE_IBM OFF)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set (CMAKE_BUILD_TYPE Release)
+endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le")
   set(ENABLE_IBM ON)
@@ -44,31 +48,73 @@ elseif(ENABLE_IBM)
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mtune=native -DHPTT_ARCH_IBM -maltivec -mabi=altivec)
 endif()
 
-set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
-
-add_library(hptt STATIC ${HPTT_SRCS})
-target_compile_features(hptt PUBLIC cxx_std_11)
-target_include_directories(hptt PUBLIC ${PROJECT_SOURCE_DIR}/include)
-#target_compile_definitions(hptt PRIVATE ${HPTT_CXX_COMPILE_DEFS})
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "9.1")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "8.2")
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -O2)
 endif()
 
-target_compile_options(hptt PUBLIC ${HPTT_CXX_FLAGS})
+set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
+
+add_library(hptt ${HPTT_SRCS})
+
+add_library(HPTT::hptt ALIAS hptt)
+
+target_include_directories(hptt 
+    PUBLIC
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+target_compile_options(hptt PRIVATE ${HPTT_CXX_FLAGS})
+
+# Install
+
+include(GNUInstallDirs)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/HPTT)
 
 install(TARGETS hptt
-        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+    EXPORT hptt-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
 
-set(HPTT_INCLUDES 
-    include/compute_node.h 
-    include/hptt_types.h 
-    include/hptt.h 
-    include/macros.h 
-    include/plan.h 
-    include/utils.h 
-    include/transpose.h)
+# set_target_properties(hptt PROPERTIES EXPORT_NAME HPTT)
 
-install(FILES ${HPTT_INCLUDES}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hptt)
+
+#Export the targets to a script
+install(EXPORT hptt-targets
+    FILE
+        HPTTTargets.cmake
+    NAMESPACE
+        HPTT::
+    DESTINATION
+        ${INSTALL_CONFIGDIR}
+)
+
+#Create a ConfigVersion.cmake file
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/HPTTConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfig.cmake
+    INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+#Install the config, configversion and custom find modules
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfigVersion.cmake
+    DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+
+export(EXPORT hptt-targets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/HPTTTargets.cmake
+    NAMESPACE HPTT::)
+
+#Register package in user's package registry
+export(PACKAGE HPTT)
