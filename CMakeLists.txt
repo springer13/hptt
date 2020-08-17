@@ -11,33 +11,25 @@ if(NOT CMAKE_BUILD_TYPE)
     set (CMAKE_BUILD_TYPE Release)
 endif()
 
+set(CMAKE_NO_SYSTEM_FROM_IMPORTED TRUE)
+
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le")
   set(ENABLE_IBM ON)
 endif()
 
-if(ENABLE_OPENMP)
-  set(HPTT_OMP_FLAGS -fopenmp)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-    set(HPTT_OMP_FLAGS -qopenmp)
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-    set(HPTT_OMP_FLAGS -qsmp=omp)
-  endif()
-endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -qopenmp -xhost)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -xhost)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if(ENABLE_IBM)
-    set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} ${HPTT_OMP_FLAGS})
-  else()
-    set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} ${HPTT_OMP_FLAGS} -march=native -mtune=native)
+  if(NOT ENABLE_IBM)
+    set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -march=native -mtune=native)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} ${HPTT_OMP_FLAGS} -march=native)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -march=native)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -silent -w -Mnovect)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -qsmp=omp)
+# elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
+#   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -qsmp=omp)
 endif()
 
 if(ENABLE_AVX)
@@ -56,7 +48,7 @@ set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
 
 add_library(hptt ${HPTT_SRCS})
 
-add_library(HPTT::hptt ALIAS hptt)
+add_library(hptt::hptt ALIAS hptt)
 
 target_include_directories(hptt 
     PUBLIC
@@ -66,10 +58,17 @@ target_include_directories(hptt
 
 target_compile_options(hptt PRIVATE ${HPTT_CXX_FLAGS})
 
+if(ENABLE_OPENMP)
+  find_package(OpenMP REQUIRED)
+  target_link_libraries(hptt PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+set_target_properties(hptt PROPERTIES EXPORT_NAME hptt)
+
 # Install
 
 include(GNUInstallDirs)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/HPTT)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/hptt)
 
 install(TARGETS hptt
     EXPORT hptt-targets
@@ -77,16 +76,15 @@ install(TARGETS hptt
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-# set_target_properties(hptt PROPERTIES EXPORT_NAME HPTT)
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hptt)
 
 #Export the targets to a script
 install(EXPORT hptt-targets
     FILE
-        HPTTTargets.cmake
+        hptt-targets.cmake
     NAMESPACE
-        HPTT::
+        hptt::
     DESTINATION
         ${INSTALL_CONFIGDIR}
 )
@@ -94,27 +92,28 @@ install(EXPORT hptt-targets
 #Create a ConfigVersion.cmake file
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/hptt-config-version.cmake
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY AnyNewerVersion
 )
 
-configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/HPTTConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfig.cmake
+configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/hptt-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/hptt-config.cmake
     INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
 )
 
 #Install the config, configversion and custom find modules
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/HPTTConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/hptt-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/hptt-config-version.cmake
     DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 
 export(EXPORT hptt-targets
-    FILE ${CMAKE_CURRENT_BINARY_DIR}/HPTTTargets.cmake
-    NAMESPACE HPTT::)
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/hptt-targets.cmake
+    NAMESPACE hptt::)
 
 #Register package in user's package registry
-export(PACKAGE HPTT)
+export(PACKAGE hptt)
