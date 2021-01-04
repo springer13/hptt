@@ -63,7 +63,7 @@ target_compile_options(hptt PRIVATE ${HPTT_CXX_FLAGS})
 
 if(ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
-  target_link_libraries(hptt PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(hptt PUBLIC OpenMP::OpenMP_C)
 endif()
 
 set_target_properties(hptt PROPERTIES EXPORT_NAME hptt)
