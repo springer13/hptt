@@ -1,7 +1,6 @@
 #pragma once
 
 #include <complex>
-#include <complex.h>
 
 #define REGISTER_BITS 256 // AVX
 #ifdef HPTT_ARCH_ARM
