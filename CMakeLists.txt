@@ -36,7 +36,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
 #   set(HPTT_ARCH_FLAGS -qsmp=omp)
 #elseif(CMAKE_CXX_COMPILER_ID STREQUAL "ARMClang")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  set(HPTT_ARCH_FLAGS -mtune=a64fx)
+  set(HPTT_ARCH_FLAGS -mcpu=native)
 endif()
 
 check_cxx_compiler_flag("${HPTT_ARCH_FLAGS}" __COMPILER_SUPPORTS_MARCH)
