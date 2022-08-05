@@ -880,7 +880,7 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
       )
    } else {
       if( useStreamingStores)
-#pragma vector nontemporal
+// #pragma vector nontemporal
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t i = myStart; i < myEnd; i++)
                if( conjA )
