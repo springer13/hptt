@@ -6,9 +6,20 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(ENABLE_IBM OFF)
+set(ENABLE_PPC OFF)
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le")
   set(ENABLE_IBM ON)
+endif()
+
+# For now this should do. Notice, however, that ppc32 is used with *BSD and Linux as well,
+# so at some point a finer approach may be needed.
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc|ppc64")
+  if(APPLE)
+    set(ENABLE_PPC ON)
+  else()
+    set(ENABLE_IBM ON)
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -16,6 +27,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(ENABLE_IBM)
     set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -fopenmp)
+  elseif(ENABLE_PPC)
+    set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -fopenmp -mtune=native)
   else()
     set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -fopenmp -march=native -mtune=native)
   endif()
@@ -33,6 +46,10 @@ elseif(ENABLE_ARM)
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mfpu=neon -DHPTT_ARCH_ARM)
 elseif(ENABLE_IBM)
   set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mtune=native -DHPTT_ARCH_IBM -maltivec -mabi=altivec)
+# If the code will move to use VSX insns, please retain non-VSX version for macOS PPC.
+# Until then perhaps a common define can be used.
+elseif(ENABLE_PPC)
+  set(HPTT_CXX_FLAGS ${HPTT_CXX_FLAGS} -mtune=native -DHPTT_ARCH_IBM -faltivec)
 endif()
 
 set(HPTT_SRCS src/hptt.cpp src/plan.cpp src/transpose.cpp src/utils.cpp)
