@@ -58,3 +58,7 @@ set(HPTT_INCLUDES
 
 install(FILES ${HPTT_INCLUDES}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+
+if(BUILD_TESTING)
+	add_subdirectory(testframework)
+endif()
