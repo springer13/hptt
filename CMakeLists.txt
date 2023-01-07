@@ -47,14 +47,18 @@ install(TARGETS hptt
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
         ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 
-set(HPTT_INCLUDES 
-    include/compute_node.h 
-    include/hptt_types.h 
-    include/hptt.h 
-    include/macros.h 
-    include/plan.h 
-    include/utils.h 
+set(HPTT_INCLUDES
+    include/compute_node.h
+    include/hptt_types.h
+    include/hptt.h
+    include/macros.h
+    include/plan.h
+    include/utils.h
     include/transpose.h)
 
 install(FILES ${HPTT_INCLUDES}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+
+if(BUILD_TESTING)
+	add_subdirectory(testframework)
+endif()
