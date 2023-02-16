@@ -115,10 +115,16 @@ def tensorTransposeAndUpdate(perm, alpha, A, beta, B, numThreads=-1):
         raise ValueError("Unsupported dtype: {}.".format(A.dtype))
 
     # tranpose!
-    tranpose_fn(permc, ctypes.c_int32(A.ndim),
-                scalar_fn(alpha), dataA, sizeA, outerSizeA,
-                scalar_fn(beta), dataB, outerSizeB,
-                ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
+    if 'float' in str(A.dtype):
+        tranpose_fn(permc, ctypes.c_int32(A.ndim),
+                    scalar_fn(alpha), dataA, sizeA, outerSizeA,
+                    scalar_fn(beta), dataB, outerSizeB,
+                    ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
+    else:
+        tranpose_fn(permc, ctypes.c_int32(A.ndim),
+                    scalar_fn(alpha), False, dataA, sizeA, outerSizeA,
+                    scalar_fn(beta), dataB, outerSizeB,
+                    ctypes.c_int32(numThreads), ctypes.c_int32(useRowMajor))
 
 
 def tensorTranspose(perm, alpha, A, numThreads=-1):
