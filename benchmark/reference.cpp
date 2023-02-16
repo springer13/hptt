@@ -13,6 +13,35 @@
 
 #include "defines.h"
 
+// Check if 'floatType' is complex
+template <typename floatType>
+class is_complex {
+  template <
+      template <typename> typename _floatType, typename T,
+      typename = typename std::enable_if<
+          std::is_same<_floatType<T>, std::complex<T>>::value, bool>::type>
+  bool static constexpr _is_complex(_floatType<T>) {
+    return true;
+  }
+  template <typename _floatType>
+  bool static constexpr _is_complex(_floatType) {
+    return false;
+  }
+
+ public:
+  static constexpr auto value =
+      _is_complex(typename std::remove_reference<
+                  typename std::remove_cv<floatType>::type>::type());
+};
+
+
+// Re-define 'conj' to make sure it return a floating point if
+// argument is a floating point
+template <typename floatType, typename = typename std::enable_if<
+                                  !is_complex<floatType>::value, bool>::type>
+floatType conj(floatType &&x) {
+  return x;
+}
 
 template<typename floatType>
 void transpose_ref( uint32_t *size, uint32_t *perm, int dim, 
@@ -57,13 +86,13 @@ void transpose_ref( uint32_t *size, uint32_t *perm, int dim,
       if( beta == (floatType) 0 )
          for(int i=0; i < sizeInner; ++i)
             if( conjA )
-               B_[i] = alpha * std::conj(A_[i * strideAinner]);
+               B_[i] = alpha * conj(A_[i * strideAinner]);
             else
                B_[i] = alpha * A_[i * strideAinner];
       else
          for(int i=0; i < sizeInner; ++i)
             if( conjA )
-               B_[i] = alpha * std::conj(A_[i * strideAinner]) + beta * B_[i];
+               B_[i] = alpha * conj(A_[i * strideAinner]) + beta * B_[i];
             else
                B_[i] = alpha * A_[i * strideAinner] + beta * B_[i];
    }
