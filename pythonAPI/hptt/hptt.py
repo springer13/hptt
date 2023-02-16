@@ -168,7 +168,7 @@ def transpose(a, axes=None):
         ``a`` with its axes permuted.
     """
     if axes is None:
-        axes = reversed(range(a.ndim))
+        axes = list(reversed(range(a.ndim)))
 
     return tensorTranspose(axes, 1.0, a)
 
