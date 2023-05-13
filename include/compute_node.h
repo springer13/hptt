@@ -15,11 +15,11 @@ class ComputeNode
             delete next;
       }
 
-   size_t start; //!< start index for at the current loop
-   size_t end; //!< end index for at the current loop
-   size_t inc; //!< increment for at the current loop
-   size_t lda; //!< stride of A w.r.t. the loop index
-   size_t ldb; //!< stride of B w.r.t. the loop index
+   int start; //!< start index for at the current loop
+   int end; //!< end index for at the current loop
+   int inc; //!< increment for at the current loop
+   int lda; //!< stride of A w.r.t. the loop index
+   int ldb; //!< stride of B w.r.t. the loop index
    ComputeNode *next; //!< next ComputeNode, this might be another loop or 'nullptr' (i.e., indicating that the macro-kernel should be called)
 };
 

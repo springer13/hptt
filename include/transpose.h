@@ -252,12 +252,12 @@ class Transpose
       floatType alpha_; //!< scaling factor for A
       floatType beta_; //!< scaling factor for B
       int dim_; //!< dimension of the tensor
-      std::vector<size_t> sizeA_; //!< size of A
+      std::vector<int> sizeA_; //!< size of A
       std::vector<int> perm_; //!< permutation 
       std::vector<int> outerSizeA_; //!< outer sizes of A
       std::vector<int> outerSizeB_;  //!< outer sizes of B
-      std::vector<size_t> lda_;  //!< strides for all dimensions of A (first dimension has a stride of 1)
-      std::vector<size_t> ldb_;  //!< strides for all dimensions of B (first dimension has a stride of 1)
+      std::vector<int> lda_;  //!< strides for all dimensions of A (first dimension has a stride of 1)
+      std::vector<int> ldb_;  //!< strides for all dimensions of B (first dimension has a stride of 1)
       std::vector<int> threadIds_; //!< OpenMP threadIds of the threads involed in the transposition
       int numThreads_;
       int selectedParallelStrategyId_;

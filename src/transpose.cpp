@@ -604,17 +604,17 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, 
                      const ComputeNode* plan)
 {
-   const size_t end = plan->end - (plan->inc - 1);
-   const size_t inc = plan->inc;
+   const int32_t end = plan->end - (plan->inc - 1);
+   const int32_t inc = plan->inc;
    const size_t lda = plan->lda;
    const size_t ldb = plan->ldb;
 
-   constexpr size_t blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
-   constexpr size_t blocking_ = blocking_micro_ * 4;
+   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
+   constexpr int blocking_ = blocking_micro_ * 4;
 
    if( plan->next->next != nullptr ){
       // recurse
-      size_t i;
+      int32_t i;
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
@@ -649,7 +649,7 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
       const size_t ldb_macro = plan->next->ldb;
       // invoke macro-kernel
       
-      size_t i;
+      int32_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
             macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores, conjA>(&A[i*lda], &A[(i+1)*lda], lda_macro, &B[i*ldb], &B[(i+1)*ldb], ldb_macro, alpha, beta);
@@ -1133,7 +1133,7 @@ float Transpose<floatType>::getLoadBalance( const std::vector<int> &parallelismS
    int totalTasks = 1;
    for(int i=0; i < dim_; ++i){
 
-      size_t inc = this->getIncrement(i);
+      int inc = this->getIncrement(i);
       while(sizeA_[i] < inc)
          inc /= 2;
       int availableParallelism = (sizeA_[i] + inc - 1) / inc;
