@@ -604,17 +604,17 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, 
                      const ComputeNode* plan)
 {
-   const int32_t end = plan->end - (plan->inc - 1);
-   const int32_t inc = plan->inc;
+   const size_t end = plan->end - (plan->inc - 1);
+   const size_t inc = plan->inc;
    const size_t lda = plan->lda;
    const size_t ldb = plan->ldb;
 
-   constexpr int blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
-   constexpr int blocking_ = blocking_micro_ * 4;
+   constexpr size_t blocking_micro_ = REGISTER_BITS/8 / sizeof(floatType);
+   constexpr size_t blocking_ = blocking_micro_ * 4;
 
    if( plan->next->next != nullptr ){
       // recurse
-      int32_t i;
+      size_t i;
       for(i = plan->start; i < end; i+= inc)
       {
          if( i + inc < end )
@@ -649,7 +649,7 @@ void transpose_int( const floatType* __restrict__ A, const floatType* __restrict
       const size_t ldb_macro = plan->next->ldb;
       // invoke macro-kernel
       
-      int32_t i;
+      size_t i;
       for(i = plan->start; i < end; i+= inc)
          if( i + inc < end )
             macro_kernel<blockingA, blockingB, betaIsZero,floatType, useStreamingStores, conjA>(&A[i*lda], &A[(i+1)*lda], lda_macro, &B[i*ldb], &B[(i+1)*ldb], ldb_macro, alpha, beta);
@@ -704,11 +704,11 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
       } else {
          if( useStreamingStores)
             if( conjA )
-#pragma vector nontemporal
+// #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
                   B[i] = alpha * conj(A[i]);
             else
-#pragma vector nontemporal
+// #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
                   B[i] = alpha * A[i];
          else
@@ -742,12 +742,12 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
          beta_(beta),
          dim_(-1),
          numThreads_(numThreads), 
-         masterPlan_(nullptr),
-         selectionMethod_(selectionMethod),
-         maxAutotuningCandidates_(-1),
          selectedParallelStrategyId_(-1),
          selectedLoopOrderId_(-1),
-         conjA_(false)
+         conjA_(false),
+         masterPlan_(nullptr),
+         selectionMethod_(selectionMethod),
+         maxAutotuningCandidates_(-1)
       {
 #ifdef _OPENMP
          omp_init_lock(&writelock);
@@ -793,12 +793,6 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                                           alpha_(other.alpha_),
                                           beta_(other.beta_),
                                           dim_(other.dim_),
-                                          numThreads_(other.numThreads_),
-                                          masterPlan_(other.masterPlan_),
-                                          selectionMethod_(other.selectionMethod_),
-                                          selectedParallelStrategyId_(other.selectedParallelStrategyId_),
-                                          selectedLoopOrderId_(other.selectedLoopOrderId_),
-                                          maxAutotuningCandidates_(other.maxAutotuningCandidates_),
                                           sizeA_(other.sizeA_),
                                           perm_(other.perm_),
                                           outerSizeA_(other.outerSizeA_),
@@ -806,7 +800,14 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                                           lda_(other.lda_),
                                           ldb_(other.ldb_),
                                           threadIds_(other.threadIds_),
-                                          conjA_(other.conjA_)
+                                          numThreads_(other.numThreads_),
+                                          selectedParallelStrategyId_(other.selectedParallelStrategyId_),
+                                          selectedLoopOrderId_(other.selectedLoopOrderId_),
+                                          conjA_(other.conjA_),
+                                          masterPlan_(other.masterPlan_),
+                                          selectionMethod_(other.selectionMethod_),
+                                          maxAutotuningCandidates_(other.maxAutotuningCandidates_)
+
       { 
 #ifdef _OPENMP
          omp_init_lock(&writelock);
@@ -918,7 +919,7 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
       if( useStreamingStores)
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t j = myStart; j < myEnd; j++)
-_Pragma("vector nontemporal")
+// _Pragma("vector nontemporal")
             for(int32_t i = 0; i < n0; i++)
                if( conjA )
                   B[i + j * ldb] = alpha * conj(A[i + j * lda]);
@@ -1007,7 +1008,7 @@ void Transpose<floatType>::execute_expert() noexcept
    }
 
    const int numTasks = masterPlan_->getNumTasks();
-   const int numThreads = numThreads_;
+   // const int numThreads = numThreads_;
    getStartEnd<spawnThreads>(numTasks, myStart, myEnd);
 
    HPTT_DUPLICATE(spawnThreads,
@@ -1129,7 +1130,7 @@ float Transpose<floatType>::getLoadBalance( const std::vector<int> &parallelismS
    int totalTasks = 1;
    for(int i=0; i < dim_; ++i){
 
-      int inc = this->getIncrement(i);
+      size_t inc = this->getIncrement(i);
       while(sizeA_[i] < inc)
          inc /= 2;
       int availableParallelism = (sizeA_[i] + inc - 1) / inc;
@@ -1259,7 +1260,7 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
          float lb2 = getLoadBalance(strat2);
 //         printVector(strat2,"strat2");
 //         printf("strat2: %f\n",getLoadBalance(strat2));
-         if( lb1 > 0.8 && lb2 < 0.85 || lb1 >lb2 && lb1 > 0.75 )
+         if( (lb1 > 0.8 && lb2 < 0.85) || (lb1 > lb2 && lb1 > 0.75) )
          {
             std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
             return;
@@ -1514,11 +1515,11 @@ void Transpose<floatType>::skipIndices(const int *sizeA, const int* perm, const 
    }
    // compact arrays (remove -1)
    for(int i=0;i < dim ; ++i)
-      if( sizeA_[i] == -1 )
+      if( (int)sizeA_[i] == -1 )
       {
          int j=i+1;
          for(;j < dim ; ++j)
-            if( sizeA_[j] != -1 )
+            if( (int)sizeA_[j] != -1 )
                break;
          if( j < dim )
             std::swap(sizeA_[i], sizeA_[j]);
@@ -1614,8 +1615,8 @@ void Transpose<floatType>::fuseIndices()
       int toMerge = i;
       perm.push_back(perm_[i]);
       while(i+1 < dim_ && perm_[i] + 1 == perm_[i+1] 
-            && (sizeA_[perm_[i]] == outerSizeA_[perm_[i]]) 
-            && (sizeA_[perm_[i]] == outerSizeB_[i]) ){ 
+            && ((int)sizeA_[perm_[i]] == outerSizeA_[perm_[i]]) 
+            && ((int)sizeA_[perm_[i]] == outerSizeB_[i]) ){ 
 #ifdef DEBUG
          fprintf(stderr,"[HPTT] MERGING indices %d and %d\n",perm_[i], perm_[i+1]); 
 #endif
@@ -1641,11 +1642,11 @@ void Transpose<floatType>::fuseIndices()
       perm_ = perm;
       // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
       int currentValue = 0;
-      for(int i=0;i < perm_.size(); ++i){
+      for(size_t i = 0;i < perm_.size(); ++i){
          //find smallest element in perm_ and rename it to currentValue
          int minValue = 1000000;
          int minPos = -1;
-         for(int pos=0; pos < perm_.size(); ++pos){
+         for(int pos = 0; pos < (int)perm_.size(); ++pos){
             if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
                minValue = perm_[pos];
                minPos = pos;
@@ -1917,10 +1918,10 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
    // heuristics, search the space with a growing rectangle (from best to worst,
    // see line marked with ***)
    bool done = false;
-   for( int start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ) && !done; start++ )
-      for( int i = 0; i < parallelismStrategies.size() && !done; i++)
+   for( size_t start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ) && !done; start++ )
+      for( size_t i = 0; i < parallelismStrategies.size() && !done; i++)
       {
-         for( int j = 0; j < loopOrders.size() && !done; j++)
+         for( size_t j = 0; j < loopOrders.size() && !done; j++)
          {
             if( i > start || j > start || (i != start && j != start) ) continue; //these are already done ***
 
@@ -1975,10 +1976,10 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
                }
             }
             plans.push_back(plan);
-            if( selectionMethod_ == ESTIMATE || 
-                selectionMethod_ == MEASURE && plans.size() > 200 || 
-                selectionMethod_ == PATIENT && plans.size() > 400 || 
-                selectionMethod_ == CRAZY && plans.size() > 800 )
+            if( (selectionMethod_ == ESTIMATE) || 
+                (selectionMethod_ == MEASURE && plans.size() > 200) || 
+                (selectionMethod_ == PATIENT && plans.size() > 400) || 
+                (selectionMethod_ == CRAZY && plans.size() > 800) )
                done = true;
          }
       }
@@ -2078,7 +2079,7 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
          }
       }
       if( this->infoLevel_ > 0 )
-         printf("We evaluated %d/%d candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
+         printf("We evaluated %d/%ld candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
    }
    return plans[bestPlan_id];
 }
