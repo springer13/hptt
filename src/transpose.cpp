@@ -835,19 +835,21 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(numThreads_)  if(numThreads_ > 1)
 #endif
+
+   const floatType* __restrict__ Bnext__ = B_;
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreshold<floatType>() ) {
             if( conjA_ )
-               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, true>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, true>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
             else
-               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, false>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, false>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
          } else {
             if( conjA_ )
-               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, true>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, true>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
             else
-               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, false>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, false>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
@@ -1011,14 +1013,15 @@ void Transpose<floatType>::execute_expert() noexcept
    // const int numThreads = numThreads_;
    getStartEnd<spawnThreads>(numTasks, myStart, myEnd);
 
+   const floatType* __restrict__ Bnext__ = B_;
    HPTT_DUPLICATE(spawnThreads,
       for( int taskId = myStart; taskId < myEnd; taskId++)
          if ( perm_[0] != 0 ) {
             auto rootNode = masterPlan_->getRootNode_const( taskId );
             if( conjA_ )
-               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, true>( A_, A_, B_, B_, alpha_, beta_, rootNode);
+               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, true>( A_, A_, B_, Bnext__, alpha_, beta_, rootNode);
             else
-               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, false>( A_, A_, B_, B_, alpha_, beta_, rootNode);
+               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, false>( A_, A_, B_, Bnext__, alpha_, beta_, rootNode);
          } else {
             auto rootNode = masterPlan_->getRootNode_const( taskId );
             if( conjA_ )
