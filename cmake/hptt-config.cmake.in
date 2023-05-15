@@ -1,0 +1,18 @@
+
+@PACKAGE_INIT@
+
+set(ENABLE_OPENMP @ENABLE_OPENMP@)
+
+if(ENABLE_OPENMP)
+    # include( CMakeFindDependencyMacro )
+    find_package(OpenMP REQUIRED)
+endif()
+
+if(NOT TARGET hptt::hptt)
+    include("${CMAKE_CURRENT_LIST_DIR}/hptt-targets.cmake")
+endif()
+
+set(HPTT_FOUND TRUE)
+set(HPTT_LIBRARIES hptt::hptt)
+set(HPTT_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+

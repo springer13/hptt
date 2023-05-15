@@ -17,7 +17,7 @@ class ComputeNode;
 class Plan
 {
    public:
-      Plan() : rootNodes_(nullptr), numTasks_(0) { }
+      Plan() : numTasks_(0), rootNodes_(nullptr) { }
 
       Plan(std::vector<int>loopOrder, std::vector<int>numThreadsAtLoop);
 

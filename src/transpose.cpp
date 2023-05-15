@@ -704,11 +704,11 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
       } else {
          if( useStreamingStores)
             if( conjA )
-#pragma vector nontemporal
+// #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
                   B[i] = alpha * conj(A[i]);
             else
-#pragma vector nontemporal
+// #pragma vector nontemporal
                for(int32_t i = plan->start; i < end; i+= inc)
                   B[i] = alpha * A[i];
          else
@@ -742,12 +742,12 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
          beta_(beta),
          dim_(-1),
          numThreads_(numThreads), 
-         masterPlan_(nullptr),
-         selectionMethod_(selectionMethod),
-         maxAutotuningCandidates_(-1),
          selectedParallelStrategyId_(-1),
          selectedLoopOrderId_(-1),
-         conjA_(false)
+         conjA_(false),
+         masterPlan_(nullptr),
+         selectionMethod_(selectionMethod),
+         maxAutotuningCandidates_(-1)
       {
 #ifdef _OPENMP
          omp_init_lock(&writelock);
@@ -793,12 +793,6 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                                           alpha_(other.alpha_),
                                           beta_(other.beta_),
                                           dim_(other.dim_),
-                                          numThreads_(other.numThreads_),
-                                          masterPlan_(other.masterPlan_),
-                                          selectionMethod_(other.selectionMethod_),
-                                          selectedParallelStrategyId_(other.selectedParallelStrategyId_),
-                                          selectedLoopOrderId_(other.selectedLoopOrderId_),
-                                          maxAutotuningCandidates_(other.maxAutotuningCandidates_),
                                           sizeA_(other.sizeA_),
                                           perm_(other.perm_),
                                           outerSizeA_(other.outerSizeA_),
@@ -806,7 +800,14 @@ void transpose_int_constStride1( const floatType* __restrict__ A, floatType* __r
                                           lda_(other.lda_),
                                           ldb_(other.ldb_),
                                           threadIds_(other.threadIds_),
-                                          conjA_(other.conjA_)
+                                          numThreads_(other.numThreads_),
+                                          selectedParallelStrategyId_(other.selectedParallelStrategyId_),
+                                          selectedLoopOrderId_(other.selectedLoopOrderId_),
+                                          conjA_(other.conjA_),
+                                          masterPlan_(other.masterPlan_),
+                                          selectionMethod_(other.selectionMethod_),
+                                          maxAutotuningCandidates_(other.maxAutotuningCandidates_)
+
       { 
 #ifdef _OPENMP
          omp_init_lock(&writelock);
@@ -834,19 +835,21 @@ void Transpose<floatType>::executeEstimate(const Plan *plan) noexcept
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(numThreads_)  if(numThreads_ > 1)
 #endif
+
+   const floatType* __restrict__ Bnext__ = B_;
    for( int taskId = 0; taskId < numTasks; taskId++)
       if ( perm_[0] != 0 ) {
          auto rootNode = plan->getRootNode_const( taskId );
          if( std::abs(beta_) < getZeroThreshold<floatType>() ) {
             if( conjA_ )
-               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, true>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, true>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
             else
-               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, false>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,1,floatType, useStreamingStores, false>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
          } else {
             if( conjA_ )
-               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, true>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, true>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
             else
-               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, false>( A_,A_, B_, B_, 0.0, 1.0, rootNode);
+               transpose_int<blocking_,blocking_,0,floatType, useStreamingStores, false>( A_,A_, B_, Bnext__, 0.0, 1.0, rootNode);
          }
       } else {
          auto rootNode = plan->getRootNode_const( taskId );
@@ -880,7 +883,7 @@ static void axpy_1D( const floatType* __restrict__ A, floatType* __restrict__ B,
       )
    } else {
       if( useStreamingStores)
-#pragma vector nontemporal
+// #pragma vector nontemporal
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t i = myStart; i < myEnd; i++)
                if( conjA )
@@ -918,7 +921,7 @@ static void axpy_2D( const floatType* __restrict__ A, const int lda,
       if( useStreamingStores)
          HPTT_DUPLICATE(spawnThreads,
             for(int32_t j = myStart; j < myEnd; j++)
-_Pragma("vector nontemporal")
+// _Pragma("vector nontemporal")
             for(int32_t i = 0; i < n0; i++)
                if( conjA )
                   B[i + j * ldb] = alpha * conj(A[i + j * lda]);
@@ -1007,17 +1010,18 @@ void Transpose<floatType>::execute_expert() noexcept
    }
 
    const int numTasks = masterPlan_->getNumTasks();
-   const int numThreads = numThreads_;
+   // const int numThreads = numThreads_;
    getStartEnd<spawnThreads>(numTasks, myStart, myEnd);
 
+   const floatType* __restrict__ Bnext__ = B_;
    HPTT_DUPLICATE(spawnThreads,
       for( int taskId = myStart; taskId < myEnd; taskId++)
          if ( perm_[0] != 0 ) {
             auto rootNode = masterPlan_->getRootNode_const( taskId );
             if( conjA_ )
-               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, true>( A_, A_, B_, B_, alpha_, beta_, rootNode);
+               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, true>( A_, A_, B_, Bnext__, alpha_, beta_, rootNode);
             else
-               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, false>( A_, A_, B_, B_, alpha_, beta_, rootNode);
+               transpose_int<blocking_,blocking_,betaIsZero,floatType, useStreamingStores, false>( A_, A_, B_, Bnext__, alpha_, beta_, rootNode);
          } else {
             auto rootNode = masterPlan_->getRootNode_const( taskId );
             if( conjA_ )
@@ -1259,7 +1263,7 @@ void Transpose<floatType>::getBestParallelismStrategy ( std::vector<int> &bestPa
          float lb2 = getLoadBalance(strat2);
 //         printVector(strat2,"strat2");
 //         printf("strat2: %f\n",getLoadBalance(strat2));
-         if( lb1 > 0.8 && lb2 < 0.85 || lb1 >lb2 && lb1 > 0.75 )
+         if( (lb1 > 0.8 && lb2 < 0.85) || (lb1 > lb2 && lb1 > 0.75) )
          {
             std::copy(strat1.begin(), strat1.end(), bestParallelismStrategy.begin());
             return;
@@ -1514,11 +1518,11 @@ void Transpose<floatType>::skipIndices(const int *sizeA, const int* perm, const 
    }
    // compact arrays (remove -1)
    for(int i=0;i < dim ; ++i)
-      if( sizeA_[i] == -1 )
+      if( (int)sizeA_[i] == -1 )
       {
          int j=i+1;
          for(;j < dim ; ++j)
-            if( sizeA_[j] != -1 )
+            if( (int)sizeA_[j] != -1 )
                break;
          if( j < dim )
             std::swap(sizeA_[i], sizeA_[j]);
@@ -1614,8 +1618,8 @@ void Transpose<floatType>::fuseIndices()
       int toMerge = i;
       perm.push_back(perm_[i]);
       while(i+1 < dim_ && perm_[i] + 1 == perm_[i+1] 
-            && (sizeA_[perm_[i]] == outerSizeA_[perm_[i]]) 
-            && (sizeA_[perm_[i]] == outerSizeB_[i]) ){ 
+            && ((int)sizeA_[perm_[i]] == outerSizeA_[perm_[i]]) 
+            && ((int)sizeA_[perm_[i]] == outerSizeB_[i]) ){ 
 #ifdef DEBUG
          fprintf(stderr,"[HPTT] MERGING indices %d and %d\n",perm_[i], perm_[i+1]); 
 #endif
@@ -1641,11 +1645,11 @@ void Transpose<floatType>::fuseIndices()
       perm_ = perm;
       // remove gaps in the perm, if requried (e.g., perm=3,1,0 -> 2,1,0)
       int currentValue = 0;
-      for(int i=0;i < perm_.size(); ++i){
+      for(size_t i = 0;i < perm_.size(); ++i){
          //find smallest element in perm_ and rename it to currentValue
          int minValue = 1000000;
          int minPos = -1;
-         for(int pos=0; pos < perm_.size(); ++pos){
+         for(int pos = 0; pos < (int)perm_.size(); ++pos){
             if ( perm_[pos] >= currentValue && perm_[pos] < minValue) {
                minValue = perm_[pos];
                minPos = pos;
@@ -1917,10 +1921,10 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
    // heuristics, search the space with a growing rectangle (from best to worst,
    // see line marked with ***)
    bool done = false;
-   for( int start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ) && !done; start++ )
-      for( int i = 0; i < parallelismStrategies.size() && !done; i++)
+   for( size_t start= 0; start< std::max( parallelismStrategies.size(), loopOrders.size() ) && !done; start++ )
+      for( size_t i = 0; i < parallelismStrategies.size() && !done; i++)
       {
-         for( int j = 0; j < loopOrders.size() && !done; j++)
+         for( size_t j = 0; j < loopOrders.size() && !done; j++)
          {
             if( i > start || j > start || (i != start && j != start) ) continue; //these are already done ***
 
@@ -1975,10 +1979,10 @@ void Transpose<floatType>::createPlans( std::vector<std::shared_ptr<Plan> > &pla
                }
             }
             plans.push_back(plan);
-            if( selectionMethod_ == ESTIMATE || 
-                selectionMethod_ == MEASURE && plans.size() > 200 || 
-                selectionMethod_ == PATIENT && plans.size() > 400 || 
-                selectionMethod_ == CRAZY && plans.size() > 800 )
+            if( (selectionMethod_ == ESTIMATE) || 
+                (selectionMethod_ == MEASURE && plans.size() > 200) || 
+                (selectionMethod_ == PATIENT && plans.size() > 400) || 
+                (selectionMethod_ == CRAZY && plans.size() > 800) )
                done = true;
          }
       }
@@ -2078,7 +2082,7 @@ std::shared_ptr<Plan> Transpose<floatType>::selectPlan( const std::vector<std::s
          }
       }
       if( this->infoLevel_ > 0 )
-         printf("We evaluated %d/%d candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
+         printf("We evaluated %d/%ld candidates and selected candidate %d.\n", plansEvaluated, plans.size(), bestPlan_id); 
    }
    return plans[bestPlan_id];
 }

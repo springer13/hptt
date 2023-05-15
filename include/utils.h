@@ -16,6 +16,7 @@ template<typename floatType>
 static floatType conj(floatType x){
    return std::conj(x);
 }
+
 template<>
 float conj(float x){
    return x;
@@ -66,7 +67,7 @@ void getPrimeFactors( int n, std::list<int> &primeFactors );
 template<typename t>
 int findPos(t value, const std::vector<t> &array)
 {
-   for(int i=0;i < array.size() ; ++i)
+   for(size_t i = 0; i < array.size(); ++i)
       if( array[i] == value )
          return i;
    return -1;
