@@ -36,5 +36,5 @@ for i in range(len(f1Content)):
       else:
          f2.write(f2Content[i])
    except:
-      print "ERROR:", i
+      print("ERROR:", i)
 f2.close()

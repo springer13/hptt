@@ -1,14 +1,14 @@
-CXX_FLAGS=-O3 -std=c++11 -DNDEBUG
+CXX_FLAGS=-O3 -std=c++11
 INCLUDE_PATH=-I./include/
 
 ifeq ($(CXX),icpc)
 CXX_FLAGS += -qopenmp -xhost 
 else
 ifeq ($(CXX),g++)
-CXX_FLAGS += -fopenmp -march=native 
+CXX_FLAGS += -fopenmp -march=native -Wno-vla
 else
 ifeq ($(CXX),clang++)
-CXX_FLAGS += -fopenmp -march=native
+CXX_FLAGS += -fopenmp -march=native -fsanitize=address -Wno-vla-extension
 endif
 endif
 endif

@@ -28,8 +28,11 @@ LIBS=-lhptt
 all: ${OBJ}
 	${CXX} ${OBJ} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} -o testframework.exe
 
+LIB_PATH+= $(OPENMP_LIB_PATH)
+LIBS+= -lomp
+
 %.o: %.cpp
-	${CXX} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
+	${CXX} ${LIB_PATH} ${LIBS} ${CXX_FLAGS} ${INCLUDE_PATH} -c $< -o $@
 
 clean:
 	rm -rf *.o benchmark.exe

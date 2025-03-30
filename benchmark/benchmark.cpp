@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
         restore(B, B_ref, total_size);
         trashCache(trash1, trash2, largerThanL3);
         auto begin_time = omp_get_wtime();
-        transpose_ref( size, perm, dim, A, alpha, B_ref, beta, false);
+        transpose_ref( size, perm, dim, A, alpha, nullptr, nullptr, 1, B_ref, beta, nullptr, nullptr, 1, false);
         double elapsed_time = omp_get_wtime() - begin_time;
         minTime = (elapsed_time < minTime) ? elapsed_time : minTime;
      }

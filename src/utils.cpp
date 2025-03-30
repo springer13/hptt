@@ -46,8 +46,8 @@ int factorial(int n){
    return n * factorial(n-1);
 }
 
-void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *perm, 
-      int *tmpSizeA, int *tmpOuterSizeA, int *tmpOuterSizeB, int *tmpPerm, const int dim, const bool useRowMajor)
+void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *offsetA, const int *offsetB, const int *perm, 
+      int *tmpSizeA, int *tmpOuterSizeA, int *tmpOuterSizeB, int *tmpOffsetA, int *tmpOffsetB, int *tmpPerm, const int dim, const bool useRowMajor)
 {
    for(int i=0; i < dim; ++i){
       int idx = i;
@@ -66,6 +66,14 @@ void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *oute
          tmpOuterSizeB[i] = sizeA[perm[idx]];
       else
          tmpOuterSizeB[i] = outerSizeB[idx];
+      if( offsetA == nullptr )
+         tmpOffsetA[i] = 0;
+      else
+         tmpOffsetA[i] = offsetA[idx];
+      if( offsetB == nullptr )
+         tmpOffsetB[i] = 0;
+      else
+         tmpOffsetB[i] = offsetB[idx];
    }
 }
 

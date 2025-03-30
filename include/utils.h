@@ -76,8 +76,8 @@ int findPos(int value, const int *array, int n);
 
 int factorial(int n);
 
-void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *perm, 
-               int *tmpSizeA, int *tmpOuterSizeA, int *tmpouterSizeB, int *tmpPerm, const int dim, const bool useRowMajor);
+void accountForRowMajor(const int *sizeA, const int *outerSizeA, const int *outerSizeB, const int *offsetA, const int *offsetB, const int *perm, 
+               int *tmpSizeA, int *tmpOuterSizeA, int *tmpOuterSizeB, int *tmpOffsetA, int *tmpOffsetB, int *tmpPerm, const int dim, const bool useRowMajor);
 }
 
 
