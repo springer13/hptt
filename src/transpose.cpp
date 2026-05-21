@@ -599,6 +599,9 @@ void transpose_int_scalar( const floatType* __restrict__ A, int sizeStride1A,
       }
    }
 }
+
+#pragma GCC push_options
+#pragma GCC optimize ("no-tree-vectorize")
 template<int blockingA, int blockingB, int betaIsZero, typename floatType, bool useStreamingStores, bool conjA>
 void transpose_int( const floatType* __restrict__ A, const floatType* __restrict__ Anext, 
                      floatType* __restrict__ B, const floatType* __restrict__ Bnext, const floatType alpha, const floatType beta, 
